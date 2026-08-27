@@ -1,0 +1,118 @@
+@using Crypto_Hockey.Models
+@using Crypto_Hockey.Services
+@inject IWalletService WalletService
+
+<div class="wallet-card">
+    <div class="wallet-header">
+        <h3>Wallet Connection</h3>
+    </div>
+
+    @if (!WalletState.IsConnected)
+    {
+        <div class="wallet-disconnected">
+            <p>Connect your MetaMask wallet to play and earn rewards!</p>
+            <button class="btn btn-primary btn-lg" @onclick="ConnectWallet">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' width='20' height='20'%3E%3Cpath fill='%23F6851B' d='M174 29l-24 6V8l24 21z'/%3E%3Cpath fill='%23763D16' d='M26 29L50 8v27L26 29z'/%3E%3Cpath fill='%23F6851B' d='M157 67l15-7-15 37v-30z'/%3E%3Cpath fill='%23763D16' d='M43 67L28 60l15 37v-30z'/%3E%3C/svg%3E" alt="MetaMask" /> 
+                Connect MetaMask
+            </button>
+            @if (!MetaMaskInstalled)
+            {
+                <p class="warning-text">MetaMask is not installed. <a href="https://metamask.io" target="_blank">Download MetaMask</a></p>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="wallet-connected">
+            <div class="wallet-info">
+                <div class="info-row">
+                    <span class="label">Address:</span>
+                    <span class="address">@FormatAddress(WalletState.Address)</span>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="CopyAddress" title="Copy Address">📋</button>
+                </div>
+                <div class="info-row">
+                    <span class="label">Network:</span>
+                    <span class="network">@WalletState.ChainName</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Balance:</span>
+                    <span class="balance">@WalletState.Balance.ToString("F4") ETH</span>
+                </div>
+            </div>
+
+            <div class="wallet-actions">
+                <button class="btn btn-secondary" @onclick="SwitchNetwork">
+                    Switch Network
+                </button>
+                <button class="btn btn-danger" @onclick="DisconnectWallet">
+                    Disconnect
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private WalletConnectionState WalletState = new();
+    private bool MetaMaskInstalled = false;
+
+    [Parameter]
+    public EventCallback<WalletConnectionState> OnWalletConnected { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if MetaMask is installed by calling the JS function
+        try
+        {
+            MetaMaskInstalled = await JSRuntime.InvokeAsync<bool>("window.metamaskInterop.isMetaMaskInstalled");
+            // Try to get existing connection state
+            WalletState = await WalletService.GetWalletStateAsync();
+        }
+        catch
+        {
+            MetaMaskInstalled = false;
+        }
+    }
+
+    private async Task ConnectWallet()
+    {
+        WalletState = await WalletService.ConnectWalletAsync();
+        await OnWalletConnected.InvokeAsync(WalletState);
+        StateHasChanged();
+    }
+
+    private async Task DisconnectWallet()
+    {
+        await WalletService.DisconnectWalletAsync();
+        WalletState = new WalletConnectionState { IsConnected = false };
+        StateHasChanged();
+    }
+
+    private async Task SwitchNetwork()
+    {
+        // Example: Switch to Sepolia testnet
+        bool success = await WalletService.SwitchNetworkAsync(11155111);
+        if (success)
+        {
+            WalletState = await WalletService.GetWalletStateAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task CopyAddress()
+    {
+        if (!string.IsNullOrEmpty(WalletState.Address))
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", WalletState.Address);
+        }
+    }
+
+    private string FormatAddress(string? address)
+    {
+        if (string.IsNullOrEmpty(address) || address.Length < 10)
+            return address ?? "";
+        return $"{address[..6]}...{address[^4..]}";
+    }
+
+    @inject IJSRuntime JSRuntime
+}

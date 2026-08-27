@@ -1,0 +1,286 @@
+@using Crypto_Hockey.Services
+@using Crypto_Hockey.Models
+@page "/game"
+@implements IAsyncDisposable
+
+<PageTitle>Crypto Hockey - Play</PageTitle>
+
+<div class="game-container">
+    <div class="game-sidebar">
+        <WalletConnection @ref="walletComponent" @bind-WalletState="currentWalletState" />
+
+        <div class="game-stats">
+            <h4>Game Stats</h4>
+            @if (currentWalletState?.IsConnected == true)
+            {
+                <div class="stats-info">
+                    <p>Player: @playerProfile?.WalletAddress?.Substring(0, 6)...</p>
+                    <p>Total Wins: @playerProfile?.TotalWins</p>
+                    <p>Total Games: @playerProfile?.TotalGames</p>
+                    <p>Win Rate: @((playerProfile?.WinRate ?? 0).ToString("F1"))%</p>
+                    <p>Total Rewards: @playerProfile?.TotalRewardsEarned.ToString("F2") A1870</p>
+                </div>
+            }
+            else
+            {
+                <p class="text-muted">Connect wallet to see your stats</p>
+            }
+        </div>
+
+        <div class="game-controls">
+            <h4>Game Settings</h4>
+            <div class="form-group">
+                <label for="difficulty">Difficulty:</label>
+                <select id="difficulty" class="form-control" @bind="selectedDifficulty">
+                    <option value="Easy">Easy</option>
+                    <option value="Medium" selected>Medium</option>
+                    <option value="Hard">Hard</option>
+                </select>
+            </div>
+
+            @if (!gameRunning && !gameOver)
+            {
+                <button class="btn btn-success btn-block" @onclick="StartGame" disabled="@(!currentWalletState?.IsConnected ?? true)">
+                    Start Game
+                </button>
+            }
+            else if (gameRunning)
+            {
+                <button class="btn btn-warning btn-block" @onclick="PauseGame">
+                    Pause Game
+                </button>
+            }
+
+            @if (gameOver)
+            {
+                <button class="btn btn-primary btn-block" @onclick="ResetGame">
+                    Play Again
+                </button>
+                @if (playerWon)
+                {
+                    <button class="btn btn-info btn-block mt-2" @onclick="ClaimReward" disabled="@rewardClaimed">
+                        @(rewardClaimed ? "Reward Claimed" : "Claim Reward")
+                    </button>
+                }
+            }
+        </div>
+    </div>
+
+    <div class="game-area">
+        <div class="game-header">
+            <div class="score-board">
+                <div class="player-score">
+                    <span class="label">You</span>
+                    <span class="score">@playerScore</span>
+                </div>
+                <div class="divider">-</div>
+                <div class="opponent-score">
+                    <span class="score">@opponentScore</span>
+                    <span class="label">AI</span>
+                </div>
+            </div>
+        </div>
+
+        <canvas @ref="canvasRef" 
+                width="800" 
+                height="400" 
+                class="game-canvas"
+                @onmousemove="OnMouseMove"
+                @ontouchmove="OnTouchMove">
+        </canvas>
+
+        @if (gameOver)
+        {
+            <div class="game-over-modal">
+                <div class="game-over-content">
+                    <h2>@(playerWon ? "🎉 YOU WON! 🎉" : "Game Over")</h2>
+                    @if (playerWon)
+                    {
+                        <p class="reward-message">You earned 10 A1870 tokens!</p>
+                    }
+                    <p>Final Score: @playerScore - @opponentScore</p>
+                    <p class="difficulty-badge">Difficulty: @selectedDifficulty</p>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private ElementReference canvasRef;
+    private WalletConnection? walletComponent;
+    private IGameEngine gameEngine = null!;
+    private WalletConnectionState? currentWalletState;
+    private PlayerProfile? playerProfile;
+
+    private bool gameRunning = false;
+    private bool gameOver = false;
+    private bool playerWon = false;
+    private bool rewardClaimed = false;
+    private int playerScore = 0;
+    private int opponentScore = 0;
+    private string selectedDifficulty = "Medium";
+    private int? currentSessionId;
+
+    private CancellationTokenSource? gameLoopCts;
+    private DateTime lastFrameTime = DateTime.UtcNow;
+
+    [Inject] IGameService GameService { get; set; } = null!;
+    [Inject] IJSRuntime JSRuntime { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        gameEngine = new GameEngine();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && canvasRef.Context == null)
+        {
+            // Canvas will be initialized when game starts
+        }
+    }
+
+    private async Task StartGame()
+    {
+        if (currentWalletState?.IsConnected != true || string.IsNullOrEmpty(currentWalletState.Address))
+            return;
+
+        // Get or create player profile
+        playerProfile = await GameService.GetOrCreatePlayerAsync(currentWalletState.Address);
+
+        // Create game session
+        var session = await GameService.CreateGameSessionAsync(currentWalletState.Address, selectedDifficulty);
+        currentSessionId = session.Id;
+
+        gameEngine.InitializeGame(selectedDifficulty);
+        gameRunning = true;
+        gameOver = false;
+        playerWon = false;
+        rewardClaimed = false;
+        playerScore = 0;
+        opponentScore = 0;
+
+        gameLoopCts = new CancellationTokenSource();
+        _ = GameLoop(gameLoopCts.Token);
+
+        StateHasChanged();
+    }
+
+    private async Task GameLoop(CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested && gameRunning)
+            {
+                var now = DateTime.UtcNow;
+                float deltaTime = (float)(now - lastFrameTime).TotalSeconds;
+                lastFrameTime = now;
+
+                // Clamp delta time to prevent huge jumps
+                if (deltaTime > 0.05f) deltaTime = 0.05f;
+
+                gameEngine.UpdateGame(deltaTime);
+                var state = gameEngine.GetGameState();
+
+                playerScore = state.PlayerScore;
+                opponentScore = state.OpponentScore;
+
+                await RenderGame(state);
+
+                if (state.GameOver)
+                {
+                    gameRunning = false;
+                    gameOver = true;
+                    playerWon = state.Winner == "Player";
+
+                    // End the game session
+                    if (currentSessionId.HasValue)
+                    {
+                        await GameService.EndGameSessionAsync(currentSessionId.Value, playerScore, opponentScore);
+                    }
+
+                    StateHasChanged();
+                    break;
+                }
+
+                await Task.Delay(16); // ~60 FPS
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error in game loop: {ex.Message}");
+        }
+    }
+
+    private async Task RenderGame(GameState state)
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("window.gameRenderer.render", canvasRef, state);
+        }
+        catch
+        {
+            // Rendering errors are non-critical
+        }
+    }
+
+    private void OnMouseMove(MouseEventArgs e)
+    {
+        if (gameRunning && canvasRef.Context != null)
+        {
+            float yPosition = (float)e.ClientY;
+            gameEngine.UpdatePaddlePosition(true, yPosition);
+        }
+    }
+
+    private void OnTouchMove(TouchEventArgs e)
+    {
+        if (gameRunning && canvasRef.Context != null && e.Touches.Length > 0)
+        {
+            float yPosition = (float)e.Touches[0].ClientY;
+            gameEngine.UpdatePaddlePosition(true, yPosition);
+        }
+    }
+
+    private void PauseGame()
+    {
+        gameRunning = false;
+        StateHasChanged();
+    }
+
+    private void ResetGame()
+    {
+        gameEngine.Reset();
+        gameOver = false;
+        playerWon = false;
+        rewardClaimed = false;
+        playerScore = 0;
+        opponentScore = 0;
+        currentSessionId = null;
+    }
+
+    private async Task ClaimReward()
+    {
+        if (currentSessionId.HasValue)
+        {
+            bool success = await GameService.ClaimRewardAsync(currentSessionId.Value);
+            if (success)
+            {
+                rewardClaimed = true;
+                // Refresh player profile
+                if (currentWalletState?.IsConnected == true)
+                {
+                    playerProfile = await GameService.GetOrCreatePlayerAsync(currentWalletState.Address);
+                }
+            }
+            StateHasChanged();
+        }
+    }
+
+    async ValueTask IAsyncDisposable.DisposeAsync()
+    {
+        gameLoopCts?.Cancel();
+        gameLoopCts?.Dispose();
+    }
+}
