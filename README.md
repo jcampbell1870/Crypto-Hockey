@@ -1,6 +1,33 @@
 # 🏒 Crypto Hockey - Web-Based Air Hockey Game with Blockchain Rewards
 
-A modern, interactive web-based air hockey game built with Blazor, featuring MetaMask wallet integration and ERC-20 token rewards using the Arcade1870 token.
+A modern, interactive web-based air hockey game featuring MetaMask wallet integration and ERC-20 token rewards using the Arcade1870 (A1870) token.
+
+## 🌐 Play it on GitHub Pages (static site)
+
+The `docs/` folder contains a **self-contained, static HTML/CSS/JavaScript**
+implementation of the game that is published via GitHub Pages (see
+`.github/workflows/deploy-pages.yml`). It requires no build step, server, or
+database, which makes it fully compatible with GitHub Pages hosting:
+
+- Open `docs/index.html` directly in a browser to run it locally, or
+- Enable GitHub Pages for this repository (Settings → Pages → Source:
+  "GitHub Actions") and the workflow will deploy the contents of `docs/`
+  automatically on every push to `main`.
+
+Gameplay: connect MetaMask, play a game of air hockey against an AI opponent
+(mouse/touch controls your paddle), and after each completed game claim your
+Arcade1870 (A1870) reward — token contract
+[`0x8eddD4edea39c5B5f77662453600F53A202EE47C`](https://etherscan.io/address/0x8eddD4edea39c5B5f77662453600F53A202EE47C).
+Because a static site has no backend/private key, the reward is claimed by
+calling a public, self-service function (`claimReward`, configurable in
+`docs/js/config.js`) on the token contract using the player's own connected
+wallet.
+
+> The `Components/`, `Services/`, `Models/`, etc. folders at the repository
+> root contain an earlier Blazor Server prototype of the same idea. Blazor
+> Server requires an ASP.NET Core host and a database, so it **cannot** run
+> on GitHub Pages — the `docs/` static site above is the version that is
+> actually published.
 
 ## 🎮 Features
 

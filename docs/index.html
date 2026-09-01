@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crypto Hockey - Play &amp; Earn A1870</title>
+  <meta name="description" content="A web-based air hockey game with MetaMask wallet connection and Arcade1870 (A1870) ERC-20 token rewards." />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header>
+    <h1>🏒 Crypto <span>Hockey</span></h1>
+    <p>Classic air hockey. Connect MetaMask. Earn Arcade1870 (A1870) tokens for playing.</p>
+  </header>
+
+  <section class="wallet-bar">
+    <button id="connect-wallet-btn">Connect MetaMask</button>
+    <span id="wallet-status">Not connected</span>
+    <span id="wallet-address"></span>
+    <span>Balance: <strong id="token-balance">—</strong></span>
+  </section>
+
+  <section class="game-controls">
+    <label for="difficulty-select">AI difficulty:</label>
+    <select id="difficulty-select">
+      <option value="easy">Easy</option>
+      <option value="medium" selected>Medium</option>
+      <option value="hard">Hard</option>
+    </select>
+    <button id="start-game-btn" disabled>Start Game</button>
+  </section>
+
+  <div id="score">You 0 — 0 AI</div>
+
+  <div class="rink-wrapper">
+    <canvas id="rink" width="480" height="640"></canvas>
+  </div>
+
+  <div id="game-over-panel" class="panel hidden">
+    <p id="game-over-message"></p>
+    <button id="claim-reward-btn">Claim A1870 Reward</button>
+    <button id="play-again-btn">Play Again</button>
+    <div id="claim-status"></div>
+  </div>
+
+  <footer>
+    <p>
+      Move your mouse or finger to control your paddle (bottom half of the rink).
+      First to 5 goals wins. Every completed game lets you claim an A1870 reward
+      directly from the token contract using your own wallet — no backend or
+      private keys required, so this game runs entirely as a static site on
+      GitHub Pages.
+    </p>
+    <p>Token contract: <code id="token-contract-address"></code></p>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/wallet.js"></script>
+  <script src="js/rewards.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    document.getElementById("token-contract-address").textContent =
+      window.CRYPTO_HOCKEY_CONFIG.tokenAddress;
+  </script>
+</body>
+</html>
