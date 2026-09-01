@@ -29,6 +29,9 @@ const Game = (() => {
     score.player = 0;
     score.ai = 0;
 
+    // Guard against duplicate listeners if init() is called again without stop().
+    canvas.removeEventListener("mousemove", handlePointerMove);
+    canvas.removeEventListener("touchmove", handleTouchMove);
     canvas.addEventListener("mousemove", handlePointerMove);
     canvas.addEventListener("touchmove", handleTouchMove, { passive: false });
   }
