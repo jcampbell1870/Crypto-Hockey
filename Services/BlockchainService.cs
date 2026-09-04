@@ -2,6 +2,7 @@ using Nethereum.Web3;
 using Nethereum.Contracts.Standards.ERC20.ContractDefinition;
 using Crypto_Hockey.Models;
 using Microsoft.Extensions.Options;
+using System.Net.Http.Json;
 
 namespace Crypto_Hockey.Services;
 
@@ -10,17 +11,24 @@ public interface IBlockchainService
     Task<bool> SendRewardAsync(string walletAddress, decimal amount, int chainId);
     Task<decimal> GetTokenBalanceAsync(string walletAddress, int chainId);
     Task<bool> ValidateWalletAsync(string walletAddress);
+    decimal GetRewardAmount();
+    int GetDefaultChainId();
 }
 
 public class BlockchainService : IBlockchainService
 {
     private readonly BlockchainConfig _config;
     private readonly ILogger<BlockchainService> _logger;
+    private readonly HttpClient _httpClient;
 
-    public BlockchainService(IOptions<BlockchainConfig> config, ILogger<BlockchainService> logger)
+    public BlockchainService(
+        IOptions<BlockchainConfig> config,
+        ILogger<BlockchainService> logger,
+        HttpClient httpClient)
     {
         _config = config.Value;
         _logger = logger;
+        _httpClient = httpClient;
     }
 
     public async Task<bool> SendRewardAsync(string walletAddress, decimal amount, int chainId)
@@ -30,20 +38,30 @@ public class BlockchainService : IBlockchainService
             if (!IsValidAddress(walletAddress))
                 return false;
 
-            var rpcUrl = GetRpcUrlForChain(chainId);
-            if (string.IsNullOrEmpty(rpcUrl))
+            if (string.IsNullOrWhiteSpace(_config.RewardIssuerUrl) ||
+                string.IsNullOrWhiteSpace(_config.RewardVaultAddress))
             {
-                _logger.LogError($"No RPC URL configured for chain {chainId}");
+                _logger.LogWarning("Reward issuer or treasury is not configured");
                 return false;
             }
 
-            var web3 = new Web3(rpcUrl);
+            var response = await _httpClient.PostAsJsonAsync(
+                _config.RewardIssuerUrl,
+                new RewardRequest(
+                    walletAddress,
+                    amount,
+                    _config.TokenContractAddress,
+                    _config.TokenSymbol,
+                    _config.RewardVaultAddress,
+                    chainId));
 
-            // Note: In production, you would need a backend wallet to send tokens
-            // This is a placeholder showing the structure
-            // For now, rewards are recorded in the database
-            _logger.LogInformation($"Reward of {amount} tokens prepared for {walletAddress} on chain {chainId}");
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Reward issuer returned {StatusCode}", response.StatusCode);
+                return false;
+            }
 
+            _logger.LogInformation("Reward issued for {WalletAddress}", walletAddress);
             return true;
         }
         catch (Exception ex)
@@ -71,7 +89,7 @@ public class BlockchainService : IBlockchainService
             var handler = web3.Eth.GetContractQueryHandler<BalanceOfFunction>();
 
             var balance = await handler.QueryAsync<decimal>(
-                _config.Arcade1870ContractAddress,
+                _config.TokenContractAddress,
                 balanceOfFunctionMessage);
 
             return balance;
@@ -87,6 +105,18 @@ public class BlockchainService : IBlockchainService
     {
         return await Task.FromResult(IsValidAddress(walletAddress));
     }
+
+    public decimal GetRewardAmount() => _config.RewardAmount;
+
+    public int GetDefaultChainId() => _config.DefaultNetworkChainId;
+
+    private sealed record RewardRequest(
+        string WalletAddress,
+        decimal Amount,
+        string TokenContractAddress,
+        string TokenSymbol,
+        string RewardVaultAddress,
+        int ChainId);
 
     private bool IsValidAddress(string address)
     {

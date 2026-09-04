@@ -20,7 +20,7 @@ builder.Services.AddDbContext<GameDbContext>(options =>
 
 // Register services
 builder.Services.AddScoped<IWalletService, WalletService>();
-builder.Services.AddScoped<IBlockchainService, BlockchainService>();
+builder.Services.AddHttpClient<IBlockchainService, BlockchainService>();
 builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddScoped<IGameEngine, GameEngine>();
 
@@ -43,4 +43,3 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
-

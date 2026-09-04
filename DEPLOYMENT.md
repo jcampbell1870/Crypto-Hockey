@@ -201,8 +201,11 @@ az webapp deployment source config-zip \
   },
   "AllowedHosts": "crypto-hockey.com,www.crypto-hockey.com",
   "BlockchainConfig": {
-	"Arcade1870ContractAddress": "0x8eddD4edea39c5B5f77662453600F53A202EE47C",
-	"RewardAmount": "10",
+	"TokenContractAddress": "0xcF0A9F89ab34D39C11B5e08e1c6aC33A47e207c8",
+	"TokenSymbol": "1870Coin",
+	"RewardAmount": 10,
+	"RewardVaultAddress": "<same Crypto Trivia treasury address>",
+	"RewardIssuerUrl": "<Render reward issuer URL>",
 	"DefaultNetworkChainId": 1,
 	"SupportedChainIds": [1, 137]
   }
@@ -220,7 +223,10 @@ ASPNETCORE_URLS = https://+:443;http://+:80
 ConnectionStrings__DefaultConnection = Server=tcp:crypto-hockey-sql.database.windows.net,1433;Initial Catalog=CryptoHockeyDb;Persist Security Info=False;User ID=sqladmin;Password=[PASSWORD];MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
 
 # Blockchain
-BlockchainConfig__Arcade1870ContractAddress = 0x8eddD4edea39c5B5f77662453600F53A202EE47C
+BlockchainConfig__TokenContractAddress = 0xcF0A9F89ab34D39C11B5e08e1c6aC33A47e207c8
+BlockchainConfig__TokenSymbol = 1870Coin
+BlockchainConfig__RewardVaultAddress = <same Crypto Trivia treasury address>
+BlockchainConfig__RewardIssuerUrl = <Render reward issuer URL>
 BlockchainConfig__EthereumRpcUrl = https://eth-mainnet.g.alchemy.com/v2/[YOUR_API_KEY]
 BlockchainConfig__PolygonRpcUrl = https://polygon-rpc.com
 

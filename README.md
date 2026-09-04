@@ -1,13 +1,13 @@
 # 🏒 Crypto Hockey - Web-Based Air Hockey Game with Blockchain Rewards
 
-A modern, interactive web-based air hockey game built with Blazor, featuring MetaMask wallet integration and ERC-20 token rewards using the Arcade1870 token.
+A modern, interactive web-based air hockey game built with Blazor, featuring MetaMask wallet integration and ERC-20 token rewards using the 1870Coin token.
 
 ## 🎮 Features
 
 - **Classic Air Hockey Gameplay**: Physics-based puck movement with paddle collision detection
 - **AI Opponent**: Three difficulty levels (Easy, Medium, Hard) with adaptive AI
 - **MetaMask Integration**: Connect your Web3 wallet securely
-- **ERC-20 Token Rewards**: Earn Arcade1870 (A1870) tokens for winning games
+- **ERC-20 Token Rewards**: Earn 1870Coin tokens for winning games
 - **Player Statistics**: Track your wins, losses, and earned rewards
 - **Global Leaderboard**: Compete against other players worldwide
 - **Responsive Design**: Play on desktop and mobile devices
@@ -76,8 +76,8 @@ Navigate to `https://localhost:5001` in your browser.
 1. **Connect Wallet**: Click "Connect MetaMask" to link your Web3 wallet
 2. **Choose Difficulty**: Select Easy, Medium, or Hard AI opponent
 3. **Play**: Use your mouse to control your paddle (left side)
-4. **Win & Earn**: First to 5 points wins! Winners earn 10 A1870 tokens
-5. **Claim Rewards**: Manually claim your earned tokens after winning
+4. **Win & Earn**: First to 5 points wins! Winners earn 10 1870Coin tokens
+5. **Claim Rewards**: The configured Render issuer pays the connected wallet from the shared treasury after verification
 
 ## 🏗️ Project Structure
 
@@ -116,13 +116,13 @@ Crypto Hockey/
 
 ## 🔐 Smart Contract Details
 
-**Arcade1870 Token**
-- Contract Address: `0x8eddD4edea39c5B5f77662453600F53A202EE47C`
+**1870Coin Token**
+- Contract Address: `0xcF0A9F89ab34D39C11B5e08e1c6aC33A47e207c8`
 - Network: Ethereum Mainnet (configurable for testnet)
 - Standard: ERC-20
-- Reward Per Win: 10 A1870 tokens
+- Reward Per Win: 10 1870Coin tokens
 
-[View on Etherscan](https://etherscan.io/token/0x8eddD4edea39c5B5f77662453600F53A202EE47C)
+[View on Etherscan](https://etherscan.io/token/0xcF0A9F89ab34D39C11B5e08e1c6aC33A47e207c8)
 
 ## 🎮 Game Mechanics
 

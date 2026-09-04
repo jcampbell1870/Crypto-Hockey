@@ -58,7 +58,7 @@ public class GameService : IGameService
 
         if (session.PlayerWon)
         {
-            session.RewardAmount = decimal.Parse("10"); // Default reward
+            session.RewardAmount = _blockchainService.GetRewardAmount();
         }
 
         _context.GameSessions.Update(session);
@@ -137,7 +137,7 @@ public class GameService : IGameService
         var success = await _blockchainService.SendRewardAsync(
             session.PlayerAddress,
             session.RewardAmount,
-            1); // Default to Ethereum mainnet, could be made configurable
+            _blockchainService.GetDefaultChainId());
 
         if (success)
         {

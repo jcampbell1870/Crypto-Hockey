@@ -18,7 +18,7 @@
                     <p>Total Wins: @playerProfile?.TotalWins</p>
                     <p>Total Games: @playerProfile?.TotalGames</p>
                     <p>Win Rate: @((playerProfile?.WinRate ?? 0).ToString("F1"))%</p>
-                    <p>Total Rewards: @playerProfile?.TotalRewardsEarned.ToString("F2") A1870</p>
+                    <p>Total Rewards: @playerProfile?.TotalRewardsEarned.ToString("F2") 1870Coin</p>
                 </div>
             }
             else
@@ -96,7 +96,7 @@
                     <h2>@(playerWon ? "🎉 YOU WON! 🎉" : "Game Over")</h2>
                     @if (playerWon)
                     {
-                        <p class="reward-message">You earned 10 A1870 tokens!</p>
+                        <p class="reward-message">You earned 10 1870Coin tokens!</p>
                     }
                     <p>Final Score: @playerScore - @opponentScore</p>
                     <p class="difficulty-badge">Difficulty: @selectedDifficulty</p>
