@@ -53,7 +53,11 @@
 </div>
 
 @code {
-    private WalletConnectionState WalletState = new();
+    [Parameter]
+    public WalletConnectionState WalletState { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<WalletConnectionState> WalletStateChanged { get; set; }
     private bool MetaMaskInstalled = false;
 
     [Parameter]
@@ -77,6 +81,7 @@
     private async Task ConnectWallet()
     {
         WalletState = await WalletService.ConnectWalletAsync();
+        await WalletStateChanged.InvokeAsync(WalletState);
         await OnWalletConnected.InvokeAsync(WalletState);
         StateHasChanged();
     }
@@ -85,6 +90,7 @@
     {
         await WalletService.DisconnectWalletAsync();
         WalletState = new WalletConnectionState { IsConnected = false };
+        await WalletStateChanged.InvokeAsync(WalletState);
         StateHasChanged();
     }
 
@@ -95,6 +101,7 @@
         if (success)
         {
             WalletState = await WalletService.GetWalletStateAsync();
+            await WalletStateChanged.InvokeAsync(WalletState);
             StateHasChanged();
         }
     }

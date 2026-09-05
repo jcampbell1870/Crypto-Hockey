@@ -110,7 +110,7 @@
     private ElementReference canvasRef;
     private WalletConnection? walletComponent;
     private IGameEngine gameEngine = null!;
-    private WalletConnectionState? currentWalletState;
+    private WalletConnectionState currentWalletState = new();
     private PlayerProfile? playerProfile;
 
     private bool gameRunning = false;
