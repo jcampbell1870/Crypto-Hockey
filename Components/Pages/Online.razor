@@ -1,0 +1,365 @@
+@using Crypto_Hockey.Models
+@using Crypto_Hockey.Services
+@page "/online"
+
+<PageTitle>Online Arena - Crypto Hockey</PageTitle>
+
+<div class="online-arena-container">
+    <h1>♠️ GG Poker Style Online Arena</h1>
+    <p class="lead">Open heads-up tables or jump into 8-player sit-and-go tournaments.</p>
+
+    <WalletConnection @bind-WalletState="walletState" />
+
+    @if (walletState.IsConnected)
+    {
+        <div class="online-panel">
+            <div class="alias-row">
+                <label for="screenName">Screen Name</label>
+                <input id="screenName" class="form-control" @bind="screenName" maxlength="24" />
+                <button class="btn btn-primary" @onclick="SaveAlias">Save Name</button>
+                <button class="btn btn-outline-primary" @onclick="RefreshLobby">Refresh Lobby</button>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(statusMessage))
+        {
+            <div class="alert alert-info mt-2">@statusMessage</div>
+        }
+
+        <div class="online-grid">
+            <section class="online-panel">
+                <div class="panel-header">
+                    <h3>🪑 Heads-Up Tables</h3>
+                    <button class="btn btn-success" @onclick="CreateHeadsUpTable">Open Table</button>
+                </div>
+
+                @if (lobby.HeadsUpMatches.Count == 0)
+                {
+                    <p class="text-muted">No active tables yet.</p>
+                }
+                else
+                {
+                    @foreach (var match in lobby.HeadsUpMatches)
+                    {
+                        <div class="arena-card">
+                            <div>
+                                <strong>@match.HostName</strong>
+                                <span>vs @(match.ChallengerName ?? "Waiting...")</span>
+                            </div>
+                            <div class="chip-row">
+                                <span class="chip">@match.Status</span>
+                                @if (!string.IsNullOrWhiteSpace(match.WinnerName))
+                                {
+                                    <span class="chip">Winner: @match.WinnerName</span>
+                                }
+                            </div>
+
+                            <div class="action-row">
+                                @if (CanJoinHeadsUp(match))
+                                {
+                                    <button class="btn btn-sm btn-primary" @onclick="() => JoinHeadsUp(match.Id)">Join</button>
+                                }
+                                @if (CanReportHeadsUp(match))
+                                {
+                                    <button class="btn btn-sm btn-outline-success" @onclick="() => ReportHeadsUp(match.Id, CurrentWallet)">Report Me Winner</button>
+                                    <button class="btn btn-sm btn-outline-warning" @onclick="() => ReportHeadsUp(match.Id, OpponentWallet(match))">Report Opponent Winner</button>
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+            </section>
+
+            <section class="online-panel">
+                <div class="panel-header">
+                    <h3>🏆 8-Player Sit & Go</h3>
+                    <button class="btn btn-success" @onclick="CreateTournament">Create Tournament</button>
+                </div>
+
+                @if (lobby.Tournaments.Count == 0)
+                {
+                    <p class="text-muted">No tournaments yet.</p>
+                }
+                else
+                {
+                    @foreach (var tournament in lobby.Tournaments)
+                    {
+                        <div class="arena-card">
+                            <div>
+                                <strong>@tournament.Name</strong>
+                                <span class="chip">@tournament.Entrants.Count/@tournament.SeatLimit players</span>
+                                <span class="chip">@tournament.Status</span>
+                                @if (!string.IsNullOrWhiteSpace(tournament.ChampionName))
+                                {
+                                    <span class="chip">Champion: @tournament.ChampionName</span>
+                                }
+                            </div>
+
+                            <div class="action-row">
+                                @if (CanJoinTournament(tournament))
+                                {
+                                    <button class="btn btn-sm btn-primary" @onclick="() => JoinTournament(tournament.Id)">Join</button>
+                                }
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => ToggleTournamentDetails(tournament.Id)">
+                                    @(selectedTournamentId == tournament.Id ? "Hide Bracket" : "View Bracket")
+                                </button>
+                            </div>
+
+                            @if (selectedTournamentId == tournament.Id)
+                            {
+                                <div class="bracket-view">
+                                    @if (tournament.Rounds.Count == 0)
+                                    {
+                                        <p class="text-muted">Bracket starts once all 8 seats are filled.</p>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var round in tournament.Rounds)
+                                        {
+                                            <div class="round-block">
+                                                <h5>Round @round[0].RoundNumber</h5>
+                                                @foreach (var bracketMatch in round)
+                                                {
+                                                    <div class="bracket-match">
+                                                        <span>@(bracketMatch.PlayerOneName ?? "TBD") vs @(bracketMatch.PlayerTwoName ?? "TBD")</span>
+                                                        @if (bracketMatch.IsComplete)
+                                                        {
+                                                            <span class="chip">Winner: @bracketMatch.WinnerName</span>
+                                                        }
+                                                        else if (CanReportTournamentMatch(tournament, bracketMatch))
+                                                        {
+                                                            <div class="action-row mt-2">
+                                                                <button class="btn btn-sm btn-outline-success" @onclick="() => ReportTournamentWinner(tournament.Id, bracketMatch.Id, CurrentWallet)">Report Me Winner</button>
+                                                                <button class="btn btn-sm btn-outline-warning" @onclick="() => ReportTournamentWinner(tournament.Id, bracketMatch.Id, TournamentOpponentWallet(bracketMatch))">Report Opponent Winner</button>
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+            </section>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info mt-4">Connect your wallet to enter online competition.</div>
+    }
+</div>
+
+@code {
+    private WalletConnectionState walletState = new();
+    private OnlineLobbySnapshot lobby = new();
+    private string screenName = string.Empty;
+    private string? statusMessage;
+    private string? selectedTournamentId;
+
+    [Inject] public IOnlineCompetitionService OnlineCompetitionService { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshLobby();
+    }
+
+    private async Task SaveAlias()
+    {
+        if (!walletState.IsConnected || string.IsNullOrWhiteSpace(walletState.Address))
+        {
+            statusMessage = "Connect your wallet before setting a screen name.";
+            return;
+        }
+
+        try
+        {
+            var player = await OnlineCompetitionService.UpsertPlayerAsync(CurrentWallet, screenName);
+            screenName = player.DisplayName;
+            statusMessage = $"Saved as {player.DisplayName}.";
+            await RefreshLobby();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = ex.Message;
+        }
+    }
+
+    private async Task RefreshLobby()
+    {
+        lobby = await OnlineCompetitionService.GetLobbySnapshotAsync();
+        StateHasChanged();
+    }
+
+    private async Task CreateHeadsUpTable()
+    {
+        await ExecuteOnlineAction(async () =>
+        {
+            var match = await OnlineCompetitionService.CreateHeadsUpMatchAsync(CurrentWallet, screenName);
+            statusMessage = $"Heads-up table {match.Id} is open.";
+        });
+    }
+
+    private async Task JoinHeadsUp(string matchId)
+    {
+        await ExecuteOnlineAction(async () =>
+        {
+            await OnlineCompetitionService.JoinHeadsUpMatchAsync(matchId, CurrentWallet, screenName);
+            statusMessage = $"Joined table {matchId}.";
+        });
+    }
+
+    private async Task ReportHeadsUp(string matchId, string? winnerWallet)
+    {
+        if (string.IsNullOrWhiteSpace(winnerWallet))
+        {
+            statusMessage = "Cannot report winner: missing player.";
+            return;
+        }
+
+        await ExecuteOnlineAction(async () =>
+        {
+            await OnlineCompetitionService.ReportHeadsUpWinnerAsync(matchId, winnerWallet, CurrentWallet);
+            statusMessage = "Heads-up result submitted.";
+        });
+    }
+
+    private async Task CreateTournament()
+    {
+        await ExecuteOnlineAction(async () =>
+        {
+            var tournament = await OnlineCompetitionService.CreateTournamentAsync(CurrentWallet, screenName);
+            selectedTournamentId = tournament.Id;
+            statusMessage = $"Tournament {tournament.Name} created.";
+        });
+    }
+
+    private async Task JoinTournament(string tournamentId)
+    {
+        await ExecuteOnlineAction(async () =>
+        {
+            var tournament = await OnlineCompetitionService.JoinTournamentAsync(tournamentId, CurrentWallet, screenName);
+            selectedTournamentId = tournament.Id;
+            statusMessage = tournament.Status == OnlineTournamentStatus.InProgress
+                ? "Tournament is full and the bracket is live."
+                : "Tournament seat locked.";
+        });
+    }
+
+    private async Task ReportTournamentWinner(string tournamentId, string matchId, string? winnerWallet)
+    {
+        if (string.IsNullOrWhiteSpace(winnerWallet))
+        {
+            statusMessage = "Cannot report winner: missing player.";
+            return;
+        }
+
+        await ExecuteOnlineAction(async () =>
+        {
+            var tournament = await OnlineCompetitionService.ReportTournamentWinnerAsync(tournamentId, matchId, winnerWallet, CurrentWallet);
+            selectedTournamentId = tournament.Id;
+            statusMessage = tournament.Status == OnlineTournamentStatus.Completed
+                ? $"Tournament complete. Champion: {tournament.ChampionName}."
+                : "Tournament match result submitted.";
+        });
+    }
+
+    private void ToggleTournamentDetails(string tournamentId)
+    {
+        selectedTournamentId = selectedTournamentId == tournamentId ? null : tournamentId;
+    }
+
+    private bool CanJoinHeadsUp(OnlineHeadsUpMatch match)
+    {
+        return walletState.IsConnected
+            && !string.IsNullOrWhiteSpace(walletState.Address)
+            && match.Status == OnlineHeadsUpStatus.WaitingForOpponent
+            && !string.Equals(match.HostWalletAddress, walletState.Address, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool CanReportHeadsUp(OnlineHeadsUpMatch match)
+    {
+        if (!walletState.IsConnected || string.IsNullOrWhiteSpace(walletState.Address))
+        {
+            return false;
+        }
+
+        return match.Status == OnlineHeadsUpStatus.InProgress
+            && (string.Equals(match.HostWalletAddress, walletState.Address, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(match.ChallengerWalletAddress, walletState.Address, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private bool CanJoinTournament(OnlineTournament tournament)
+    {
+        if (!walletState.IsConnected || string.IsNullOrWhiteSpace(walletState.Address))
+        {
+            return false;
+        }
+
+        var alreadyJoined = tournament.Entrants
+            .Any(entrant => string.Equals(entrant.WalletAddress, walletState.Address, StringComparison.OrdinalIgnoreCase));
+
+        return tournament.Status == OnlineTournamentStatus.Registration
+            && tournament.Entrants.Count < tournament.SeatLimit
+            && !alreadyJoined;
+    }
+
+    private bool CanReportTournamentMatch(OnlineTournament tournament, OnlineTournamentMatch bracketMatch)
+    {
+        if (!walletState.IsConnected || string.IsNullOrWhiteSpace(walletState.Address) || bracketMatch.IsComplete)
+        {
+            return false;
+        }
+
+        if (tournament.Status != OnlineTournamentStatus.InProgress)
+        {
+            return false;
+        }
+
+        return string.Equals(bracketMatch.PlayerOneWalletAddress, walletState.Address, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(bracketMatch.PlayerTwoWalletAddress, walletState.Address, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string? OpponentWallet(OnlineHeadsUpMatch match)
+    {
+        if (string.Equals(match.HostWalletAddress, walletState.Address, StringComparison.OrdinalIgnoreCase))
+        {
+            return match.ChallengerWalletAddress;
+        }
+
+        return match.HostWalletAddress;
+    }
+
+    private string? TournamentOpponentWallet(OnlineTournamentMatch bracketMatch)
+    {
+        if (string.Equals(bracketMatch.PlayerOneWalletAddress, walletState.Address, StringComparison.OrdinalIgnoreCase))
+        {
+            return bracketMatch.PlayerTwoWalletAddress;
+        }
+
+        return bracketMatch.PlayerOneWalletAddress;
+    }
+
+    private async Task ExecuteOnlineAction(Func<Task> action)
+    {
+        if (!walletState.IsConnected || string.IsNullOrWhiteSpace(walletState.Address))
+        {
+            statusMessage = "Connect wallet first.";
+            return;
+        }
+
+        try
+        {
+            await action();
+            await RefreshLobby();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = ex.Message;
+        }
+    }
+
+    private string CurrentWallet => walletState.Address ?? string.Empty;
+}

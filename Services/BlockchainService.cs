@@ -1,55 +1,147 @@
-using Nethereum.Web3;
-using Nethereum.Contracts.Standards.ERC20.ContractDefinition;
+using System.Net.Http.Json;
+using System.Text.Json;
 using Crypto_Hockey.Models;
 using Microsoft.Extensions.Options;
+using Nethereum.Contracts.Standards.ERC20.ContractDefinition;
+using Nethereum.Web3;
 
 namespace Crypto_Hockey.Services;
 
 public interface IBlockchainService
 {
     Task<bool> SendRewardAsync(string walletAddress, decimal amount, int chainId);
+    Task<RewardClaimResult> RequestRewardClaimAsync(string walletAddress, RewardGameProof gameProof);
     Task<decimal> GetTokenBalanceAsync(string walletAddress, int chainId);
     Task<bool> ValidateWalletAsync(string walletAddress);
 }
 
 public class BlockchainService : IBlockchainService
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     private readonly BlockchainConfig _config;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<BlockchainService> _logger;
 
-    public BlockchainService(IOptions<BlockchainConfig> config, ILogger<BlockchainService> logger)
+    public BlockchainService(
+        IOptions<BlockchainConfig> config,
+        IHttpClientFactory httpClientFactory,
+        ILogger<BlockchainService> logger)
     {
         _config = config.Value;
+        _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
 
     public async Task<bool> SendRewardAsync(string walletAddress, decimal amount, int chainId)
     {
+        if (!IsValidAddress(walletAddress))
+        {
+            return false;
+        }
+
+        var claim = await RequestRewardClaimAsync(walletAddress, new RewardGameProof
+        {
+            GameId = $"legacy-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            Mode = "legacy",
+            CompletedAt = DateTime.UtcNow,
+            PlayerWon = true
+        });
+
+        if (!claim.IsSuccessful)
+        {
+            return false;
+        }
+
+        _logger.LogInformation(
+            "Reward claim package issued for {WalletAddress} amount {Amount} on chain {ChainId}",
+            walletAddress,
+            amount,
+            chainId);
+
+        return true;
+    }
+
+    public async Task<RewardClaimResult> RequestRewardClaimAsync(string walletAddress, RewardGameProof gameProof)
+    {
         try
         {
             if (!IsValidAddress(walletAddress))
-                return false;
-
-            var rpcUrl = GetRpcUrlForChain(chainId);
-            if (string.IsNullOrEmpty(rpcUrl))
             {
-                _logger.LogError($"No RPC URL configured for chain {chainId}");
-                return false;
+                return new RewardClaimResult
+                {
+                    IsSuccessful = false,
+                    ErrorMessage = "Invalid wallet address."
+                };
             }
 
-            var web3 = new Web3(rpcUrl);
+            if (string.IsNullOrWhiteSpace(_config.RewardIssuerUrl))
+            {
+                _logger.LogWarning("Reward issuer URL is not configured; using offline success fallback.");
+                return new RewardClaimResult { IsSuccessful = true };
+            }
 
-            // Note: In production, you would need a backend wallet to send tokens
-            // This is a placeholder showing the structure
-            // For now, rewards are recorded in the database
-            _logger.LogInformation($"Reward of {amount} tokens prepared for {walletAddress} on chain {chainId}");
+            var client = _httpClientFactory.CreateClient();
+            using var response = await client.PostAsJsonAsync(_config.RewardIssuerUrl, new
+            {
+                recipient = walletAddress,
+                game = new
+                {
+                    gameId = gameProof.GameId,
+                    mode = gameProof.Mode,
+                    playerScore = gameProof.PlayerScore,
+                    opponentScore = gameProof.OpponentScore,
+                    difficultyLevel = gameProof.DifficultyLevel,
+                    completedAt = gameProof.CompletedAt,
+                    playerWon = gameProof.PlayerWon
+                }
+            });
 
-            return true;
+            if (!response.IsSuccessStatusCode)
+            {
+                var rawError = await response.Content.ReadAsStringAsync();
+                _logger.LogError(
+                    "Reward issuer rejected claim for {WalletAddress}. Status {StatusCode}: {Error}",
+                    walletAddress,
+                    (int)response.StatusCode,
+                    rawError);
+
+                return new RewardClaimResult
+                {
+                    IsSuccessful = false,
+                    ErrorMessage = string.IsNullOrWhiteSpace(rawError)
+                        ? $"Issuer error {(int)response.StatusCode}."
+                        : rawError
+                };
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<RewardClaimPayload>(JsonOptions);
+            if (payload == null)
+            {
+                return new RewardClaimResult
+                {
+                    IsSuccessful = false,
+                    ErrorMessage = "Reward issuer response was empty."
+                };
+            }
+
+            return new RewardClaimResult
+            {
+                IsSuccessful = true,
+                Payload = payload
+            };
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Error sending reward: {ex.Message}");
-            return false;
+            _logger.LogError(ex, "Reward issuer call failed for wallet {WalletAddress}", walletAddress);
+            return new RewardClaimResult
+            {
+                IsSuccessful = false,
+                ErrorMessage = ex.Message
+            };
         }
     }
 
@@ -66,7 +158,6 @@ public class BlockchainService : IBlockchainService
 
             var web3 = new Web3(rpcUrl);
 
-            // Call contract to get balance
             var balanceOfFunctionMessage = new BalanceOfFunction { Owner = walletAddress };
             var handler = web3.Eth.GetContractQueryHandler<BalanceOfFunction>();
 
@@ -78,7 +169,7 @@ public class BlockchainService : IBlockchainService
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Error getting token balance: {ex.Message}");
+            _logger.LogError("Error getting token balance: {Message}", ex.Message);
             return 0;
         }
     }
@@ -88,9 +179,9 @@ public class BlockchainService : IBlockchainService
         return await Task.FromResult(IsValidAddress(walletAddress));
     }
 
-    private bool IsValidAddress(string address)
+    private static bool IsValidAddress(string address)
     {
-        return !string.IsNullOrEmpty(address) && address.StartsWith("0x") && address.Length == 42;
+        return !string.IsNullOrEmpty(address) && address.StartsWith("0x", StringComparison.OrdinalIgnoreCase) && address.Length == 42;
     }
 
     private string GetRpcUrlForChain(int chainId)

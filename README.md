@@ -7,9 +7,10 @@ A modern, interactive web-based air hockey game built with Blazor, featuring Met
 - **Classic Air Hockey Gameplay**: Physics-based puck movement with paddle collision detection
 - **AI Opponent**: Three difficulty levels (Easy, Medium, Hard) with adaptive AI
 - **MetaMask Integration**: Connect your Web3 wallet securely
-- **ERC-20 Token Rewards**: Earn Arcade1870 (A1870) tokens for winning games
+- **Crypto-Chess Aligned Payouts**: Uses shared Arcade1870 reward vault + issuer claim flow
 - **Player Statistics**: Track your wins, losses, and earned rewards
 - **Global Leaderboard**: Compete against other players worldwide
+- **Online Arena**: GG Poker-style heads-up tables and 8-player tournaments
 - **Responsive Design**: Play on desktop and mobile devices
 - **Dark-Themed UI**: Modern, crypto-friendly interface
 
@@ -77,7 +78,7 @@ Navigate to `https://localhost:5001` in your browser.
 2. **Choose Difficulty**: Select Easy, Medium, or Hard AI opponent
 3. **Play**: Use your mouse to control your paddle (left side)
 4. **Win & Earn**: First to 5 points wins! Winners earn 10 A1870 tokens
-5. **Claim Rewards**: Manually claim your earned tokens after winning
+5. **Claim Rewards**: Claim through the same issuer/vault payout flow used by Crypto Chess
 
 ## 🏗️ Project Structure
 
@@ -257,8 +258,8 @@ dotnet test
 
 ## 📈 Future Enhancements
 
-- [ ] Multiplayer support (peer-to-peer)
-- [ ] Tournament modes
+- [x] Multiplayer heads-up arena
+- [x] 8-player tournament mode
 - [ ] NFT rewards for milestones
 - [ ] Advanced statistics and analytics
 - [ ] Seasonal rewards and events
