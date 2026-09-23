@@ -170,6 +170,34 @@ Switch networks in-game using the "Switch Network" button in wallet panel.
 
 ## 🚢 Deployment
 
+### Render Deployment
+
+This repository is an ASP.NET Core app, so Render must deploy it as a **.NET web service**, not a Node service.
+
+1. Create the service from this repository using the root `render.yaml`, or set the service environment to `.NET`.
+2. Use the provided build command:
+
+```bash
+dotnet publish "Crypto Hockey.csproj" -c Release -o ./publish
+```
+
+3. Use the provided start command:
+
+```bash
+dotnet ./publish/Crypto_Hockey.dll --urls http://0.0.0.0:$PORT
+```
+
+4. Set required environment variables in Render:
+
+```bash
+ASPNETCORE_ENVIRONMENT=Production
+ConnectionStrings__DefaultConnection=your_connection_string
+BlockchainConfig__EthereumRpcUrl=https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
+BlockchainConfig__RewardIssuerUrl=https://your-issuer-service/api/reward-claim
+```
+
+If Render shows `Running 'yarn start'` or complains that `package.json` is missing, the service was created with the wrong runtime and should be recreated or updated to use the .NET configuration above.
+
 ### Azure Deployment
 
 ```bash

@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: crypto-hockey
+    env: dotnet
+    buildCommand: 'dotnet publish "Crypto Hockey.csproj" -c Release -o ./publish'
+    startCommand: 'dotnet ./publish/Crypto_Hockey.dll --urls http://0.0.0.0:$PORT'
+    autoDeploy: true
+    healthCheckPath: /
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production

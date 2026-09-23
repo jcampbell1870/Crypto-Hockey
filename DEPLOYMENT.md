@@ -120,6 +120,30 @@ ab -n 100 -c 10 https://crypto-hockey-staging.azurewebsites.net/
 
 ## Production Deployment
 
+### Render Production Deployment
+
+Use Render as a **.NET web service** for this repository. If Render tries to run `yarn` or looks for `package.json`, the service has been configured as Node instead of .NET.
+
+**Build Command**
+```bash
+dotnet publish "Crypto Hockey.csproj" -c Release -o ./publish
+```
+
+**Start Command**
+```bash
+dotnet ./publish/Crypto_Hockey.dll --urls http://0.0.0.0:$PORT
+```
+
+**Required Environment Variables**
+```bash
+ASPNETCORE_ENVIRONMENT=Production
+ConnectionStrings__DefaultConnection=your_connection_string
+BlockchainConfig__EthereumRpcUrl=https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
+BlockchainConfig__RewardIssuerUrl=https://your-issuer-service/api/reward-claim
+```
+
+If you are creating a new Render service, deploy from the root `render.yaml` so Render uses the correct runtime automatically.
+
 ### Pre-Production Checklist
 
 **Security**
