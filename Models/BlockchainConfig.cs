@@ -3,6 +3,8 @@ namespace Crypto_Hockey.Models;
 public class BlockchainConfig
 {
     public string Arcade1870ContractAddress { get; set; } = string.Empty;
+    public string RewardVaultAddress { get; set; } = string.Empty;
+    public string RewardIssuerUrl { get; set; } = string.Empty;
     public string RewardAmount { get; set; } = "10";
     public string EthereumRpcUrl { get; set; } = string.Empty;
     public string SepoliaRpcUrl { get; set; } = string.Empty;

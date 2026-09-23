@@ -23,6 +23,8 @@ builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddScoped<IBlockchainService, BlockchainService>();
 builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddScoped<IGameEngine, GameEngine>();
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<IOnlineCompetitionService, OnlineCompetitionService>();
 
 var app = builder.Build();
 
@@ -43,4 +45,3 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
-

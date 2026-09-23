@@ -11,7 +11,7 @@
 
         <div class="game-stats">
             <h4>Game Stats</h4>
-            @if (currentWalletState?.IsConnected == true)
+            @if (currentWalletState.IsConnected)
             {
                 <div class="stats-info">
                     <p>Player: @playerProfile?.WalletAddress?.Substring(0, 6)...</p>
@@ -40,7 +40,7 @@
 
             @if (!gameRunning && !gameOver)
             {
-                <button class="btn btn-success btn-block" @onclick="StartGame" disabled="@(!currentWalletState?.IsConnected ?? true)">
+                <button class="btn btn-success btn-block" @onclick="StartGame" disabled="@(!currentWalletState.IsConnected)">
                     Start Game
                 </button>
             }
@@ -110,7 +110,7 @@
     private ElementReference canvasRef;
     private WalletConnection? walletComponent;
     private IGameEngine gameEngine = null!;
-    private WalletConnectionState? currentWalletState;
+    private WalletConnectionState currentWalletState = new();
     private PlayerProfile? playerProfile;
 
     private bool gameRunning = false;
@@ -143,7 +143,7 @@
 
     private async Task StartGame()
     {
-        if (currentWalletState?.IsConnected != true || string.IsNullOrEmpty(currentWalletState.Address))
+        if (!currentWalletState.IsConnected || string.IsNullOrEmpty(currentWalletState.Address))
             return;
 
         // Get or create player profile
@@ -269,9 +269,9 @@
             {
                 rewardClaimed = true;
                 // Refresh player profile
-                if (currentWalletState?.IsConnected == true)
+                if (currentWalletState.IsConnected)
                 {
-                    playerProfile = await GameService.GetOrCreatePlayerAsync(currentWalletState.Address);
+                    playerProfile = await GameService.GetOrCreatePlayerAsync(currentWalletState.Address!);
                 }
             }
             StateHasChanged();

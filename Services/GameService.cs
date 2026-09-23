@@ -1,5 +1,6 @@
 using Crypto_Hockey.Models;
 using Crypto_Hockey.Data;
+using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 
 namespace Crypto_Hockey.Services;
@@ -18,12 +19,18 @@ public class GameService : IGameService
 {
     private readonly GameDbContext _context;
     private readonly IBlockchainService _blockchainService;
+    private readonly BlockchainConfig _blockchainConfig;
     private readonly ILogger<GameService> _logger;
 
-    public GameService(GameDbContext context, IBlockchainService blockchainService, ILogger<GameService> logger)
+    public GameService(
+        GameDbContext context,
+        IBlockchainService blockchainService,
+        IOptions<BlockchainConfig> blockchainOptions,
+        ILogger<GameService> logger)
     {
         _context = context;
         _blockchainService = blockchainService;
+        _blockchainConfig = blockchainOptions.Value;
         _logger = logger;
     }
 
@@ -58,7 +65,7 @@ public class GameService : IGameService
 
         if (session.PlayerWon)
         {
-            session.RewardAmount = decimal.Parse("10"); // Default reward
+            session.RewardAmount = ParseConfiguredRewardAmount();
         }
 
         _context.GameSessions.Update(session);
@@ -133,20 +140,44 @@ public class GameService : IGameService
         if (session == null || session.RewardClaimed || !session.PlayerWon)
             return false;
 
-        // Attempt to send reward
-        var success = await _blockchainService.SendRewardAsync(
+        var rewardClaim = await _blockchainService.RequestRewardClaimAsync(
             session.PlayerAddress,
-            session.RewardAmount,
-            1); // Default to Ethereum mainnet, could be made configurable
+            new RewardGameProof
+            {
+                GameId = session.Id.ToString(),
+                Mode = "hockey",
+                PlayerScore = session.PlayerScore,
+                OpponentScore = session.OpponentScore,
+                DifficultyLevel = session.DifficultyLevel,
+                CompletedAt = session.EndedAt,
+                PlayerWon = session.PlayerWon
+            });
 
-        if (success)
+        if (rewardClaim.IsSuccessful)
         {
             session.RewardClaimed = true;
+            session.TransactionHash = !string.IsNullOrWhiteSpace(rewardClaim.Payload?.Nonce)
+                ? $"issuer-claim:{rewardClaim.Payload.Nonce}"
+                : session.TransactionHash;
             _context.GameSessions.Update(session);
             await _context.SaveChangesAsync();
-            _logger.LogInformation($"Reward claimed for session {sessionId}");
+            _logger.LogInformation("Reward claim package issued for session {SessionId}", sessionId);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "Reward claim failed for session {SessionId}: {Reason}",
+                sessionId,
+                rewardClaim.ErrorMessage ?? "Unknown error");
         }
 
-        return success;
+        return rewardClaim.IsSuccessful;
+    }
+
+    private decimal ParseConfiguredRewardAmount()
+    {
+        return decimal.TryParse(_blockchainConfig.RewardAmount, out var configuredAmount)
+            ? configuredAmount
+            : 10m;
     }
 }
