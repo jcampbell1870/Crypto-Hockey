@@ -114,9 +114,14 @@ class OnlineArenaService:
             winner = _normalize_wallet(winner_wallet_address)
             if winner.lower() not in participants:
                 raise ValueError("Winner must be one of the seated players.")
+            canonical_winner = next(
+                participant
+                for participant in [match["host_wallet_address"], match["challenger_wallet_address"]]
+                if participant and participant.lower() == winner.lower()
+            )
 
-            match["winner_wallet_address"] = winner
-            match["winner_name"] = self._players.get(winner, {}).get("display_name", _short_wallet(winner))
+            match["winner_wallet_address"] = canonical_winner
+            match["winner_name"] = self._players.get(canonical_winner, {}).get("display_name", _short_wallet(canonical_winner))
             match["status"] = "Completed"
             match["updated_at"] = datetime.utcnow().isoformat()
             return deepcopy(match)
@@ -204,9 +209,14 @@ class OnlineArenaService:
             winner = _normalize_wallet(winner_wallet_address)
             if winner.lower() not in participants:
                 raise ValueError("Winner must be seated in the selected tournament match.")
+            canonical_winner = next(
+                participant
+                for participant in [match["player_one_wallet_address"], match["player_two_wallet_address"]]
+                if participant and participant.lower() == winner.lower()
+            )
 
-            match["winner_wallet_address"] = winner
-            match["winner_name"] = self._players.get(winner, {}).get("display_name", _short_wallet(winner))
+            match["winner_wallet_address"] = canonical_winner
+            match["winner_name"] = self._players.get(canonical_winner, {}).get("display_name", _short_wallet(canonical_winner))
             match["is_complete"] = True
             tournament["updated_at"] = datetime.utcnow().isoformat()
             self._advance_tournament(tournament, match["round_number"])

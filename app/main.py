@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime
+from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
+from uuid import uuid4
 
 import httpx
+from eth_account import Account
+from eth_account.messages import encode_defunct
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -17,6 +21,8 @@ from app.database import Base, engine, get_db
 from app.models import GameSession, PlayerProfile
 from app.online_arena import online_arena
 from app.schemas import (
+    ChallengeRequest,
+    ClaimRewardRequest,
     ClaimRewardResponse,
     CompleteGameSessionRequest,
     CreateGameSessionRequest,
@@ -33,6 +39,7 @@ app = FastAPI(title=settings.app_name)
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "wwwroot")), name="static")
 Base.metadata.create_all(bind=engine)
+challenge_store: dict[str, dict] = {}
 
 
 @app.on_event("startup")
@@ -128,6 +135,84 @@ async def _request_reward_claim(wallet_address: str, proof: RewardGameProof) -> 
     return True, None, nonce
 
 
+def _cleanup_challenges() -> None:
+    now = datetime.utcnow()
+    expired = [challenge_id for challenge_id, challenge in challenge_store.items() if challenge["expires_at"] <= now]
+    for challenge_id in expired:
+        challenge_store.pop(challenge_id, None)
+
+
+def _issue_challenge(
+    wallet_address: str,
+    action: str,
+    session_id: int,
+    player_score: int | None = None,
+    opponent_score: int | None = None,
+) -> dict:
+    _cleanup_challenges()
+    challenge_id = uuid4().hex
+    nonce = uuid4().hex
+    issued_at = datetime.utcnow()
+    lines = [
+        "Crypto Hockey authorization",
+        f"Action: {action}",
+        f"Wallet: {wallet_address}",
+        f"Session: {session_id}",
+    ]
+    if player_score is not None and opponent_score is not None:
+        lines.append(f"PlayerScore: {player_score}")
+        lines.append(f"OpponentScore: {opponent_score}")
+    lines.append(f"Nonce: {nonce}")
+    lines.append(f"IssuedAt: {issued_at.isoformat()}Z")
+    message = "\n".join(lines)
+    challenge_store[challenge_id] = {
+        "wallet_address": wallet_address,
+        "action": action,
+        "session_id": session_id,
+        "player_score": player_score,
+        "opponent_score": opponent_score,
+        "message": message,
+        "expires_at": issued_at + timedelta(minutes=5),
+        "used": False,
+    }
+    return {
+        "challenge_id": challenge_id,
+        "message": message,
+        "expires_at": challenge_store[challenge_id]["expires_at"].isoformat() + "Z",
+    }
+
+
+def _verify_challenge(
+    *,
+    challenge_id: str,
+    signature: str,
+    wallet_address: str,
+    action: str,
+    session_id: int,
+    player_score: int | None = None,
+    opponent_score: int | None = None,
+) -> None:
+    _cleanup_challenges()
+    challenge = challenge_store.get(challenge_id)
+    if challenge is None or challenge["used"]:
+        raise HTTPException(status_code=400, detail="Challenge is invalid or already used.")
+    if challenge["wallet_address"].lower() != wallet_address.lower():
+        raise HTTPException(status_code=403, detail="Challenge wallet does not match the session owner.")
+    if challenge["action"] != action or challenge["session_id"] != session_id:
+        raise HTTPException(status_code=400, detail="Challenge does not match this request.")
+    if challenge["player_score"] != player_score or challenge["opponent_score"] != opponent_score:
+        raise HTTPException(status_code=400, detail="Challenge does not match the submitted score.")
+
+    recovered_wallet = Account.recover_message(
+        encode_defunct(text=challenge["message"]),
+        signature=signature,
+    )
+    if recovered_wallet.lower() != wallet_address.lower():
+        raise HTTPException(status_code=403, detail="Signature does not match the session owner.")
+
+    challenge["used"] = True
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request) -> HTMLResponse:
     return templates.TemplateResponse("index.html", {"request": request, "page_name": "home"})
@@ -177,6 +262,23 @@ def online_page(request: Request) -> HTMLResponse:
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/api/auth/challenge")
+def create_auth_challenge(payload: ChallengeRequest, db: Session = Depends(get_db)) -> dict:
+    wallet = _normalize_wallet(payload.wallet_address)
+    session = db.get(GameSession, payload.session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Game session not found.")
+    if session.player_address.lower() != wallet.lower():
+        raise HTTPException(status_code=403, detail="Wallet does not own this session.")
+    return _issue_challenge(
+        wallet_address=wallet,
+        action=payload.action,
+        session_id=payload.session_id,
+        player_score=payload.player_score,
+        opponent_score=payload.opponent_score,
+    )
 
 
 @app.get("/api/players/{wallet_address}")
@@ -230,6 +332,15 @@ def complete_game_session(session_id: int, payload: CompleteGameSessionRequest, 
         raise HTTPException(status_code=404, detail="Game session not found.")
     if session.ended_at is not None:
         return _session_to_dict(session)
+    _verify_challenge(
+        challenge_id=payload.challenge_id,
+        signature=payload.signature,
+        wallet_address=session.player_address,
+        action="complete_session",
+        session_id=session.id,
+        player_score=payload.player_score,
+        opponent_score=payload.opponent_score,
+    )
 
     session.ended_at = datetime.utcnow()
     session.player_score = payload.player_score
@@ -253,7 +364,7 @@ def complete_game_session(session_id: int, payload: CompleteGameSessionRequest, 
 
 
 @app.post("/api/game-sessions/{session_id}/claim", response_model=ClaimRewardResponse)
-async def claim_reward(session_id: int, db: Session = Depends(get_db)) -> ClaimRewardResponse:
+async def claim_reward(session_id: int, payload: ClaimRewardRequest, db: Session = Depends(get_db)) -> ClaimRewardResponse:
     session = db.get(GameSession, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Game session not found.")
@@ -261,6 +372,13 @@ async def claim_reward(session_id: int, db: Session = Depends(get_db)) -> ClaimR
         return ClaimRewardResponse(success=False, error_message="Reward cannot be claimed before the session is complete.")
     if session.reward_claimed or not session.player_won:
         return ClaimRewardResponse(success=False, error_message="Reward cannot be claimed for this session.")
+    _verify_challenge(
+        challenge_id=payload.challenge_id,
+        signature=payload.signature,
+        wallet_address=session.player_address,
+        action="claim_reward",
+        session_id=session.id,
+    )
 
     proof = RewardGameProof(
         game_id=str(session.id),

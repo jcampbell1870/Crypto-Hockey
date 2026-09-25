@@ -13,12 +13,19 @@ class CreateGameSessionRequest(BaseModel):
 class CompleteGameSessionRequest(BaseModel):
     player_score: int = Field(ge=0)
     opponent_score: int = Field(ge=0)
+    challenge_id: str = Field(min_length=1)
+    signature: str = Field(min_length=1)
 
 
 class ClaimRewardResponse(BaseModel):
     success: bool
     error_message: str | None = None
     nonce: str | None = None
+
+
+class ClaimRewardRequest(BaseModel):
+    challenge_id: str = Field(min_length=1)
+    signature: str = Field(min_length=1)
 
 
 class UpsertPlayerRequest(BaseModel):
@@ -28,6 +35,14 @@ class UpsertPlayerRequest(BaseModel):
 
 class SyncPlayerRequest(BaseModel):
     wallet_address: str = Field(min_length=1)
+
+
+class ChallengeRequest(BaseModel):
+    wallet_address: str = Field(min_length=1)
+    action: str = Field(min_length=1)
+    session_id: int = Field(gt=0)
+    player_score: int | None = Field(default=None, ge=0)
+    opponent_score: int | None = Field(default=None, ge=0)
 
 
 class CreateOnlineMatchRequest(BaseModel):

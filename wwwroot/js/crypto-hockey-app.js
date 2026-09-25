@@ -14,15 +14,6 @@
         return `${address.slice(0, 6)}...${address.slice(-4)}`;
     }
 
-    function escapeHtml(value) {
-        return String(value ?? "")
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#39;");
-    }
-
     function showMessage(element, message, isError = false) {
         if (!element) return;
         if (!message) {
@@ -328,25 +319,36 @@
         if (!refreshButton || !body) return;
 
         function renderRows(players) {
-            body.innerHTML = players.map((player, index) => {
-                const rankBadge = index === 0
-                    ? '<span class="badge badge-gold">🥇 1st</span>'
-                    : index === 1
-                        ? '<span class="badge badge-silver">🥈 2nd</span>'
-                        : index === 2
-                            ? '<span class="badge badge-bronze">🥉 3rd</span>'
-                            : `<span class="badge bg-secondary">${index + 1}</span>`;
-                return `
-                    <tr class="${index < 3 ? `top-${index + 1}` : ""}">
-                        <td class="rank-col">${rankBadge}</td>
-                        <td class="address-col">${player.wallet_address}</td>
-                        <td class="stats-col text-center"><span class="wins-badge">${player.total_wins}</span></td>
-                        <td class="stats-col text-center">${player.total_games}</td>
-                        <td class="stats-col text-center"><span class="winrate">${Number(player.win_rate).toFixed(1)}%</span></td>
-                        <td class="rewards-col text-right"><span class="rewards">${Number(player.total_rewards_earned).toFixed(2)}</span><span class="token-symbol">A1870</span></td>
-                    </tr>
-                `;
-            }).join("");
+            body.replaceChildren();
+            players.forEach((player, index) => {
+                const row = createElement("tr", { className: index < 3 ? `top-${index + 1}` : "" });
+                const rankCell = createElement("td", { className: "rank-col" });
+                if (index === 0) {
+                    rankCell.appendChild(createElement("span", { className: "badge badge-gold", text: "🥇 1st" }));
+                } else if (index === 1) {
+                    rankCell.appendChild(createElement("span", { className: "badge badge-silver", text: "🥈 2nd" }));
+                } else if (index === 2) {
+                    rankCell.appendChild(createElement("span", { className: "badge badge-bronze", text: "🥉 3rd" }));
+                } else {
+                    rankCell.appendChild(createElement("span", { className: "badge bg-secondary", text: String(index + 1) }));
+                }
+
+                const addressCell = createElement("td", { className: "address-col", text: player.wallet_address });
+                const winsCell = createElement("td", { className: "stats-col text-center" }, [
+                    createElement("span", { className: "wins-badge", text: String(player.total_wins) })
+                ]);
+                const gamesCell = createElement("td", { className: "stats-col text-center", text: String(player.total_games) });
+                const rateCell = createElement("td", { className: "stats-col text-center" }, [
+                    createElement("span", { className: "winrate", text: `${Number(player.win_rate).toFixed(1)}%` })
+                ]);
+                const rewardsCell = createElement("td", { className: "rewards-col text-right" }, [
+                    createElement("span", { className: "rewards", text: Number(player.total_rewards_earned).toFixed(2) }),
+                    createElement("span", { className: "token-symbol", text: "A1870" })
+                ]);
+
+                [rankCell, addressCell, winsCell, gamesCell, rateCell, rewardsCell].forEach((cell) => row.appendChild(cell));
+                body.appendChild(row);
+            });
         }
 
         refreshButton.addEventListener("click", async () => {
@@ -412,11 +414,24 @@
 
         async function submitFinalState() {
             if (finalStateSubmitted || !activeSessionId) return;
+            const challenge = await apiFetch("/api/auth/challenge", {
+                method: "POST",
+                body: JSON.stringify({
+                    wallet_address: walletState.address,
+                    action: "complete_session",
+                    session_id: activeSessionId,
+                    player_score: engine.state.playerScore,
+                    opponent_score: engine.state.opponentScore
+                })
+            });
+            const signature = await window.metamaskInterop.signMessage(challenge.message);
             await apiFetch(`/api/game-sessions/${activeSessionId}/complete`, {
                 method: "POST",
                 body: JSON.stringify({
                     player_score: engine.state.playerScore,
-                    opponent_score: engine.state.opponentScore
+                    opponent_score: engine.state.opponentScore,
+                    challenge_id: challenge.challenge_id,
+                    signature
                 })
             });
             finalStateSubmitted = true;
@@ -512,7 +527,22 @@
         });
         claimButton.addEventListener("click", async () => {
             if (!activeSessionId) return;
-            const result = await apiFetch(`/api/game-sessions/${activeSessionId}/claim`, { method: "POST" });
+            const challenge = await apiFetch("/api/auth/challenge", {
+                method: "POST",
+                body: JSON.stringify({
+                    wallet_address: walletState.address,
+                    action: "claim_reward",
+                    session_id: activeSessionId
+                })
+            });
+            const signature = await window.metamaskInterop.signMessage(challenge.message);
+            const result = await apiFetch(`/api/game-sessions/${activeSessionId}/claim`, {
+                method: "POST",
+                body: JSON.stringify({
+                    challenge_id: challenge.challenge_id,
+                    signature
+                })
+            });
             if (result.success) {
                 claimButton.disabled = true;
                 claimButton.textContent = "Reward Claimed";

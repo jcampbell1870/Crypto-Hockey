@@ -231,5 +231,24 @@ window.metamaskInterop = {
             console.error('Error sending transaction:', error);
             throw error;
         }
+    },
+
+    signMessage: async function (message) {
+        if (!this.isMetaMaskInstalled()) {
+            throw new Error('MetaMask is not installed');
+        }
+
+        const accounts = await window.ethereum.request({
+            method: 'eth_accounts'
+        });
+
+        if (!accounts || accounts.length === 0) {
+            throw new Error('No accounts found');
+        }
+
+        return await window.ethereum.request({
+            method: 'personal_sign',
+            params: [message, accounts[0]]
+        });
     }
 };
