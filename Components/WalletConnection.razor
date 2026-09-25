@@ -102,7 +102,7 @@
 
         if (AutoConnect && !WalletState.IsConnected)
         {
-            await ConnectWalletInternalAsync(allowDeepLinkFallback: false);
+            await ConnectWalletInternalAsync(refreshEnvironment: true, allowDeepLinkFallback: false);
         }
 
         StateHasChanged();
@@ -113,9 +113,9 @@
         await ConnectWalletInternalAsync();
     }
 
-    private async Task ConnectWalletInternalAsync(bool allowDeepLinkFallback = true)
+    private async Task ConnectWalletInternalAsync(bool refreshEnvironment = true, bool allowDeepLinkFallback = true)
     {
-        if (allowDeepLinkFallback)
+        if (refreshEnvironment)
         {
             await RefreshWalletEnvironmentAsync();
         }
