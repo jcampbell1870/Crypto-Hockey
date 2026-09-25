@@ -32,6 +32,12 @@
 
         <div class="game-controls">
             <h4>Game Settings</h4>
+            @if (!string.IsNullOrWhiteSpace(gameErrorMessage))
+            {
+                <div class="alert alert-danger" role="alert">
+                    @gameErrorMessage
+                </div>
+            }
             <div class="form-group">
                 <label for="difficulty">Difficulty:</label>
                 <select id="difficulty" class="form-control" @bind="selectedDifficulty">
@@ -124,6 +130,7 @@
     private int opponentScore = 0;
     private string selectedDifficulty = "Medium";
     private int? currentSessionId;
+    private string? gameErrorMessage;
 
     private CancellationTokenSource? gameLoopCts;
     private DateTime lastFrameTime = DateTime.UtcNow;
@@ -181,23 +188,36 @@
         if (!currentWalletState.IsConnected || string.IsNullOrEmpty(currentWalletState.Address))
             return;
 
-        // Get or create player profile
-        playerProfile = await GameService.GetOrCreatePlayerAsync(currentWalletState.Address);
+        try
+        {
+            gameErrorMessage = null;
 
-        // Create game session
-        var session = await GameService.CreateGameSessionAsync(currentWalletState.Address, selectedDifficulty);
-        currentSessionId = session.Id;
+            // Get or create player profile
+            playerProfile = await GameService.GetOrCreatePlayerAsync(currentWalletState.Address);
 
-        gameEngine.InitializeGame(selectedDifficulty);
-        gameRunning = true;
-        gameOver = false;
-        playerWon = false;
-        rewardClaimed = false;
-        playerScore = 0;
-        opponentScore = 0;
+            // Create game session
+            var session = await GameService.CreateGameSessionAsync(currentWalletState.Address, selectedDifficulty);
+            currentSessionId = session.Id;
 
-        gameLoopCts = new CancellationTokenSource();
-        _ = GameLoop(gameLoopCts.Token);
+            gameEngine.InitializeGame(selectedDifficulty);
+            gameRunning = true;
+            gameOver = false;
+            playerWon = false;
+            rewardClaimed = false;
+            playerScore = 0;
+            opponentScore = 0;
+            lastFrameTime = DateTime.UtcNow;
+
+            gameLoopCts = new CancellationTokenSource();
+            _ = GameLoop(gameLoopCts.Token);
+        }
+        catch (Exception ex)
+        {
+            gameRunning = false;
+            currentSessionId = null;
+            gameErrorMessage = "Unable to start the game right now. Please try again in a moment.";
+            Console.WriteLine($"Error starting game: {ex.Message}");
+        }
 
         StateHasChanged();
     }
@@ -293,22 +313,37 @@
         playerScore = 0;
         opponentScore = 0;
         currentSessionId = null;
+        gameErrorMessage = null;
     }
 
     private async Task ClaimReward()
     {
         if (currentSessionId.HasValue)
         {
-            bool success = await GameService.ClaimRewardAsync(currentSessionId.Value);
-            if (success)
+            try
             {
-                rewardClaimed = true;
-                // Refresh player profile
-                if (currentWalletState.IsConnected)
+                gameErrorMessage = null;
+                bool success = await GameService.ClaimRewardAsync(currentSessionId.Value);
+                if (success)
                 {
-                    playerProfile = await GameService.GetOrCreatePlayerAsync(currentWalletState.Address!);
+                    rewardClaimed = true;
+                    // Refresh player profile
+                    if (currentWalletState.IsConnected)
+                    {
+                        playerProfile = await GameService.GetOrCreatePlayerAsync(currentWalletState.Address!);
+                    }
+                }
+                else
+                {
+                    gameErrorMessage = "Reward claim could not be completed right now.";
                 }
             }
+            catch (Exception ex)
+            {
+                gameErrorMessage = "Reward claim failed. Please try again shortly.";
+                Console.WriteLine($"Error claiming reward: {ex.Message}");
+            }
+
             StateHasChanged();
         }
     }
