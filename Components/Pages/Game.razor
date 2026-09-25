@@ -8,7 +8,7 @@
 
 <div class="game-container">
     <div class="game-sidebar">
-        <WalletConnection @ref="walletComponent" @bind-WalletState="currentWalletState" />
+        <WalletConnection @ref="walletComponent" @bind-WalletState="currentWalletState" AutoConnect="@AutoConnectWallet" />
 
         <div class="game-stats">
             <h4>Game Stats</h4>
@@ -125,9 +125,13 @@
 
     private CancellationTokenSource? gameLoopCts;
     private DateTime lastFrameTime = DateTime.UtcNow;
+    [SupplyParameterFromQuery(Name = "autoconnect")]
+    private bool? AutoConnectQuery { get; set; }
 
     [Inject] IGameService GameService { get; set; } = null!;
     [Inject] IJSRuntime JSRuntime { get; set; } = null!;
+
+    private bool AutoConnectWallet => AutoConnectQuery.GetValueOrDefault();
 
     protected override async Task OnInitializedAsync()
     {

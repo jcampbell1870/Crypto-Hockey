@@ -88,6 +88,9 @@
     [Parameter]
     public EventCallback<WalletConnectionState> WalletStateChanged { get; set; }
 
+    [Parameter]
+    public bool AutoConnect { get; set; }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender)
@@ -96,14 +99,23 @@
         }
 
         await RefreshWalletEnvironmentAsync();
+
+        if (AutoConnect && !WalletState.IsConnected && MetaMaskInstalled)
+        {
+            await ConnectWallet(allowDeepLinkFallback: false);
+        }
+
         StateHasChanged();
     }
 
-    private async Task ConnectWallet()
+    private async Task ConnectWallet(bool allowDeepLinkFallback = true)
     {
-        await RefreshWalletEnvironmentAsync();
+        if (allowDeepLinkFallback)
+        {
+            await RefreshWalletEnvironmentAsync();
+        }
 
-        if (IsMobileDevice && (!MetaMaskInstalled || IsInAppBrowser))
+        if (allowDeepLinkFallback && IsMobileDevice && (!MetaMaskInstalled || IsInAppBrowser))
         {
             await OpenInMetaMaskApp();
             return;

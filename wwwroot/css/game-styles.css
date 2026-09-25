@@ -171,6 +171,21 @@
     box-shadow: 0 10px 20px rgba(78, 205, 196, 0.3);
 }
 
+.homepage-wallet-entry {
+    max-width: 720px;
+    margin: 0 auto;
+}
+
+.wallet-launch-btn {
+    min-width: 280px;
+}
+
+.wallet-launch-help {
+    color: #a0a0ff;
+    margin-top: 15px;
+    margin-bottom: 0;
+}
+
 .warning-text {
     color: #ffa500;
     font-size: 0.9rem;

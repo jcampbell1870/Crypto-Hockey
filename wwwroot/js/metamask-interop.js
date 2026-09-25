@@ -49,8 +49,12 @@ window.metamaskInterop = {
     },
 
     getMetaMaskDeepLink: function () {
-        const currentUrl = window.location.href.replace(/^https?:\/\//i, '');
-        return `https://link.metamask.io/dapp/${encodeURI(currentUrl)}`;
+        return this.getMetaMaskDeepLinkForUrl(window.location.href);
+    },
+
+    getMetaMaskDeepLinkForUrl: function (targetUrl) {
+        const normalizedUrl = targetUrl.replace(/^https?:\/\//i, '');
+        return `https://link.metamask.io/dapp/${encodeURI(normalizedUrl)}`;
     },
 
     openInMetaMask: function () {
@@ -59,6 +63,19 @@ window.metamaskInterop = {
         }
 
         const deepLink = this.getMetaMaskDeepLink();
+        window.location.assign(deepLink);
+        return true;
+    },
+
+    openGameInMetaMask: function () {
+        const gameUrl = new URL('/game?autoconnect=1', window.location.origin).href;
+
+        if (!this.isMobileDevice()) {
+            window.location.assign(gameUrl);
+            return false;
+        }
+
+        const deepLink = this.getMetaMaskDeepLinkForUrl(gameUrl);
         window.location.assign(deepLink);
         return true;
     },
