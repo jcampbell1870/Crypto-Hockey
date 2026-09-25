@@ -1,4 +1,6 @@
-﻿@page "/"
+﻿@using Crypto_Hockey.Models
+@page "/"
+@rendermode InteractiveServer
 
 <PageTitle>Crypto Hockey</PageTitle>
 
@@ -37,6 +39,10 @@
                 Enter Online Arena
             </a>
         </div>
+
+        <div class="mt-4">
+            <WalletConnection @bind-WalletState="walletState" />
+        </div>
     </div>
 </div>
 
@@ -50,6 +56,10 @@
                     <h4>Connect Wallet</h4>
                     <p>Connect your MetaMask wallet to get started</p>
                 </div>
+
+                @code {
+                    private WalletConnectionState walletState = new();
+                }
             </div>
             <div class="col-md-4">
                 <div class="step-card">
