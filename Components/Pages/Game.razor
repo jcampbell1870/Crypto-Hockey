@@ -126,12 +126,12 @@
     private CancellationTokenSource? gameLoopCts;
     private DateTime lastFrameTime = DateTime.UtcNow;
     [SupplyParameterFromQuery(Name = "autoconnect")]
-    private bool? AutoConnectQuery { get; set; }
+    private bool AutoConnectQuery { get; set; }
 
     [Inject] IGameService GameService { get; set; } = null!;
     [Inject] IJSRuntime JSRuntime { get; set; } = null!;
 
-    private bool AutoConnectWallet => AutoConnectQuery.GetValueOrDefault();
+    private bool AutoConnectWallet => AutoConnectQuery;
 
     protected override async Task OnInitializedAsync()
     {

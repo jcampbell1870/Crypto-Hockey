@@ -68,7 +68,7 @@ window.metamaskInterop = {
     },
 
     openGameInMetaMask: function () {
-        const gameUrl = new URL('/game?autoconnect=1', window.location.origin).href;
+        const gameUrl = new URL('/game?autoconnect=true', window.location.origin).href;
 
         if (!this.isMobileDevice()) {
             window.location.assign(gameUrl);
