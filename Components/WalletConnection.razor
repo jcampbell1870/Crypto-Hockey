@@ -81,6 +81,7 @@
     private bool autoConnectPending = false;
     private int autoConnectAttempts = 0;
     private const int MaxAutoConnectAttempts = 2;
+    private bool? lastAutoConnectValue = null;
 
     [Parameter]
     public EventCallback<WalletConnectionState> OnWalletConnected { get; set; }
@@ -96,6 +97,13 @@
 
     protected override void OnParametersSet()
     {
+        if (lastAutoConnectValue != AutoConnect)
+        {
+            autoConnectPending = false;
+            autoConnectAttempts = 0;
+            lastAutoConnectValue = AutoConnect;
+        }
+
         if (AutoConnect && !WalletState.IsConnected && !autoConnectPending && autoConnectAttempts == 0)
         {
             autoConnectPending = true;
