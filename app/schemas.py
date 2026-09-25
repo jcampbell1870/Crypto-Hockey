@@ -26,6 +26,10 @@ class UpsertPlayerRequest(BaseModel):
     display_name: str = ""
 
 
+class SyncPlayerRequest(BaseModel):
+    wallet_address: str = Field(min_length=1)
+
+
 class CreateOnlineMatchRequest(BaseModel):
     wallet_address: str = Field(min_length=1)
     display_name: str = ""

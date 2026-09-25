@@ -24,6 +24,7 @@ from app.schemas import (
     JoinOnlineMatchRequest,
     ReportWinnerRequest,
     RewardGameProof,
+    SyncPlayerRequest,
     UpsertPlayerRequest,
 )
 
@@ -180,7 +181,16 @@ def healthz() -> dict[str, str]:
 
 @app.get("/api/players/{wallet_address}")
 def get_player(wallet_address: str, db: Session = Depends(get_db)) -> dict:
-    player = _get_or_create_player(db, wallet_address)
+    wallet = _normalize_wallet(wallet_address)
+    player = db.scalar(select(PlayerProfile).where(PlayerProfile.wallet_address == wallet))
+    if player is None:
+        raise HTTPException(status_code=404, detail="Player not found.")
+    return _player_to_dict(player)
+
+
+@app.post("/api/players")
+def sync_player(payload: SyncPlayerRequest, db: Session = Depends(get_db)) -> dict:
+    player = _get_or_create_player(db, payload.wallet_address)
     return _player_to_dict(player)
 
 
@@ -247,6 +257,8 @@ async def claim_reward(session_id: int, db: Session = Depends(get_db)) -> ClaimR
     session = db.get(GameSession, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Game session not found.")
+    if session.ended_at is None:
+        return ClaimRewardResponse(success=False, error_message="Reward cannot be claimed before the session is complete.")
     if session.reward_claimed or not session.player_won:
         return ClaimRewardResponse(success=False, error_message="Reward cannot be claimed for this session.")
 

@@ -61,6 +61,54 @@
         return payload;
     }
 
+    function createElement(tag, options = {}, children = []) {
+        const element = document.createElement(tag);
+        if (options.className) {
+            element.className = options.className;
+        }
+        if (options.text !== undefined) {
+            element.textContent = options.text;
+        }
+        if (options.dataset) {
+            Object.entries(options.dataset).forEach(([key, value]) => {
+                if (value !== undefined && value !== null) {
+                    element.dataset[key] = String(value);
+                }
+            });
+        }
+        if (options.attributes) {
+            Object.entries(options.attributes).forEach(([key, value]) => {
+                if (value !== undefined && value !== null) {
+                    element.setAttribute(key, String(value));
+                }
+            });
+        }
+        children.forEach((child) => {
+            if (child) {
+                element.appendChild(child);
+            }
+        });
+        return element;
+    }
+
+    function renderPlayerStats(container, profile) {
+        if (!container) return;
+        container.replaceChildren();
+        if (!profile) {
+            container.appendChild(createElement("p", { className: "text-muted", text: "Connect wallet to see your stats." }));
+            return;
+        }
+
+        const rows = [
+            `Player: ${shortWallet(profile.wallet_address)}`,
+            `Total Wins: ${profile.total_wins}`,
+            `Total Games: ${profile.total_games}`,
+            `Win Rate: ${Number(profile.win_rate).toFixed(1)}%`,
+            `Total Rewards: ${Number(profile.total_rewards_earned).toFixed(2)} A1870`
+        ];
+        rows.forEach((text) => container.appendChild(createElement("p", { text })));
+    }
+
     function createWalletController(onStateChange) {
         const disconnected = document.getElementById("wallet-disconnected");
         const connected = document.getElementById("wallet-connected");
@@ -338,16 +386,13 @@
             walletState = state;
             startButton.disabled = !walletState.isConnected;
             if (walletState.isConnected && walletState.address) {
-                const profile = await apiFetch(`/api/players/${encodeURIComponent(walletState.address)}`);
-                stats.innerHTML = `
-                    <p>Player: ${shortWallet(profile.wallet_address)}</p>
-                    <p>Total Wins: ${profile.total_wins}</p>
-                    <p>Total Games: ${profile.total_games}</p>
-                    <p>Win Rate: ${Number(profile.win_rate).toFixed(1)}%</p>
-                    <p>Total Rewards: ${Number(profile.total_rewards_earned).toFixed(2)} A1870</p>
-                `;
+                const profile = await apiFetch("/api/players", {
+                    method: "POST",
+                    body: JSON.stringify({ wallet_address: walletState.address })
+                });
+                renderPlayerStats(stats, profile);
             } else {
-                stats.innerHTML = '<p class="text-muted">Connect wallet to see your stats.</p>';
+                renderPlayerStats(stats, null);
             }
         });
 
@@ -377,13 +422,7 @@
             finalStateSubmitted = true;
             if (walletState.address) {
                 const profile = await apiFetch(`/api/players/${encodeURIComponent(walletState.address)}`);
-                stats.innerHTML = `
-                    <p>Player: ${shortWallet(profile.wallet_address)}</p>
-                    <p>Total Wins: ${profile.total_wins}</p>
-                    <p>Total Games: ${profile.total_games}</p>
-                    <p>Win Rate: ${Number(profile.win_rate).toFixed(1)}%</p>
-                    <p>Total Rewards: ${Number(profile.total_rewards_earned).toFixed(2)} A1870</p>
-                `;
+                renderPlayerStats(stats, profile);
             }
         }
 
@@ -558,74 +597,128 @@
         }
 
         function renderLobby() {
-            headsUpList.innerHTML = lobby.heads_up_matches.length === 0
-                ? '<p class="text-muted">No active tables yet.</p>'
-                : lobby.heads_up_matches.map((match) => `
-                    <div class="arena-card">
-                        <div>
-                            <strong>${escapeHtml(match.host_name)}</strong>
-                            <span>vs ${escapeHtml(match.challenger_name || "Waiting...")}</span>
-                        </div>
-                        <div class="chip-row">
-                            <span class="chip">${escapeHtml(match.status)}</span>
-                            ${match.winner_name ? `<span class="chip">Winner: ${escapeHtml(match.winner_name)}</span>` : ""}
-                        </div>
-                        <div class="action-row">
-                            ${canJoinHeadsUp(match) ? `<button class="btn btn-sm btn-primary" data-action="join-heads-up" data-match-id="${escapeHtml(match.id)}">Join</button>` : ""}
-                            ${canReportHeadsUp(match) ? `
-                                <button class="btn btn-sm btn-outline-success" data-action="report-heads-up" data-match-id="${escapeHtml(match.id)}" data-winner="${escapeHtml(walletState.address || "")}">Report Me Winner</button>
-                                <button class="btn btn-sm btn-outline-warning" data-action="report-heads-up" data-match-id="${escapeHtml(match.id)}" data-winner="${escapeHtml(opponentWallet(match) || "")}">Report Opponent Winner</button>
-                            ` : ""}
-                        </div>
-                    </div>
-                `).join("");
+            headsUpList.replaceChildren();
+            if (lobby.heads_up_matches.length === 0) {
+                headsUpList.appendChild(createElement("p", { className: "text-muted", text: "No active tables yet." }));
+            } else {
+                lobby.heads_up_matches.forEach((match) => {
+                    const infoBlock = createElement("div", {}, [
+                        createElement("strong", { text: match.host_name }),
+                        document.createTextNode(`vs ${match.challenger_name || "Waiting..."}`)
+                    ]);
 
-            tournamentList.innerHTML = lobby.tournaments.length === 0
-                ? '<p class="text-muted">No tournaments yet.</p>'
-                : lobby.tournaments.map((tournament) => `
-                    <div class="arena-card">
-                        <div>
-                            <strong>${escapeHtml(tournament.name)}</strong>
-                            <span class="chip">${tournament.entrants.length}/${tournament.seat_limit} players</span>
-                            <span class="chip">${escapeHtml(tournament.status)}</span>
-                            ${tournament.champion_name ? `<span class="chip">Champion: ${escapeHtml(tournament.champion_name)}</span>` : ""}
-                        </div>
-                        <div class="action-row">
-                            ${canJoinTournament(tournament) ? `<button class="btn btn-sm btn-primary" data-action="join-tournament" data-tournament-id="${escapeHtml(tournament.id)}">Join</button>` : ""}
-                            <button class="btn btn-sm btn-outline-primary" data-action="toggle-tournament" data-tournament-id="${escapeHtml(tournament.id)}">
-                                ${selectedTournamentId === String(tournament.id) ? "Hide Bracket" : "View Bracket"}
-                            </button>
-                        </div>
-                        ${selectedTournamentId === String(tournament.id) ? `
-                            <div class="bracket-view">
-                                ${tournament.rounds.length === 0
-                                    ? '<p class="text-muted">Bracket starts once all 8 seats are filled.</p>'
-                                    : tournament.rounds.map((round) => `
-                                        <div class="round-block">
-                                            <h5>Round ${round[0].round_number}</h5>
-                                            ${round.map((match) => `
-                                                <div class="bracket-match">
-                                                    <span>${escapeHtml(match.player_one_name || "TBD")} vs ${escapeHtml(match.player_two_name || "TBD")}</span>
-                                                    ${match.is_complete
-                                                        ? `<span class="chip">Winner: ${escapeHtml(match.winner_name)}</span>`
-                                                        : canReportTournamentMatch(tournament, match)
-                                                            ? `
-                                                                <div class="action-row mt-2">
-                                                                    <button class="btn btn-sm btn-outline-success" data-action="report-tournament" data-tournament-id="${escapeHtml(tournament.id)}" data-match-id="${escapeHtml(match.id)}" data-winner="${escapeHtml(walletState.address || "")}">Report Me Winner</button>
-                                                                    <button class="btn btn-sm btn-outline-warning" data-action="report-tournament" data-tournament-id="${escapeHtml(tournament.id)}" data-match-id="${escapeHtml(match.id)}" data-winner="${escapeHtml(tournamentOpponentWallet(match) || "")}">Report Opponent Winner</button>
-                                                                </div>
-                                                            `
-                                                            : ""
-                                                    }
-                                                </div>
-                                            `).join("")}
-                                        </div>
-                                    `).join("")
+                    const chipRow = createElement("div", { className: "chip-row" }, [
+                        createElement("span", { className: "chip", text: match.status })
+                    ]);
+                    if (match.winner_name) {
+                        chipRow.appendChild(createElement("span", { className: "chip", text: `Winner: ${match.winner_name}` }));
+                    }
+
+                    const actionRow = createElement("div", { className: "action-row" });
+                    if (canJoinHeadsUp(match)) {
+                        actionRow.appendChild(createElement("button", {
+                            className: "btn btn-sm btn-primary",
+                            text: "Join",
+                            dataset: { action: "join-heads-up", matchId: match.id }
+                        }));
+                    }
+                    if (canReportHeadsUp(match)) {
+                        actionRow.appendChild(createElement("button", {
+                            className: "btn btn-sm btn-outline-success",
+                            text: "Report Me Winner",
+                            dataset: { action: "report-heads-up", matchId: match.id, winner: walletState.address || "" }
+                        }));
+                        actionRow.appendChild(createElement("button", {
+                            className: "btn btn-sm btn-outline-warning",
+                            text: "Report Opponent Winner",
+                            dataset: { action: "report-heads-up", matchId: match.id, winner: opponentWallet(match) || "" }
+                        }));
+                    }
+
+                    headsUpList.appendChild(createElement("div", { className: "arena-card" }, [infoBlock, chipRow, actionRow]));
+                });
+            }
+
+            tournamentList.replaceChildren();
+            if (lobby.tournaments.length === 0) {
+                tournamentList.appendChild(createElement("p", { className: "text-muted", text: "No tournaments yet." }));
+                return;
+            }
+
+            lobby.tournaments.forEach((tournament) => {
+                const header = createElement("div", {}, [
+                    createElement("strong", { text: tournament.name }),
+                    createElement("span", { className: "chip", text: `${tournament.entrants.length}/${tournament.seat_limit} players` }),
+                    createElement("span", { className: "chip", text: tournament.status })
+                ]);
+                if (tournament.champion_name) {
+                    header.appendChild(createElement("span", { className: "chip", text: `Champion: ${tournament.champion_name}` }));
+                }
+
+                const actionRow = createElement("div", { className: "action-row" });
+                if (canJoinTournament(tournament)) {
+                    actionRow.appendChild(createElement("button", {
+                        className: "btn btn-sm btn-primary",
+                        text: "Join",
+                        dataset: { action: "join-tournament", tournamentId: tournament.id }
+                    }));
+                }
+                actionRow.appendChild(createElement("button", {
+                    className: "btn btn-sm btn-outline-primary",
+                    text: selectedTournamentId === String(tournament.id) ? "Hide Bracket" : "View Bracket",
+                    dataset: { action: "toggle-tournament", tournamentId: tournament.id }
+                }));
+
+                const cardChildren = [header, actionRow];
+                if (selectedTournamentId === String(tournament.id)) {
+                    const bracketView = createElement("div", { className: "bracket-view" });
+                    if (tournament.rounds.length === 0) {
+                        bracketView.appendChild(createElement("p", { className: "text-muted", text: "Bracket starts once all 8 seats are filled." }));
+                    } else {
+                        tournament.rounds.forEach((round) => {
+                            const roundBlock = createElement("div", { className: "round-block" }, [
+                                createElement("h5", { text: `Round ${round[0].round_number}` })
+                            ]);
+                            round.forEach((match) => {
+                                const matchCard = createElement("div", { className: "bracket-match" }, [
+                                    createElement("span", { text: `${match.player_one_name || "TBD"} vs ${match.player_two_name || "TBD"}` })
+                                ]);
+                                if (match.is_complete) {
+                                    matchCard.appendChild(createElement("span", { className: "chip", text: `Winner: ${match.winner_name}` }));
+                                } else if (canReportTournamentMatch(tournament, match)) {
+                                    const reportRow = createElement("div", { className: "action-row mt-2" });
+                                    reportRow.appendChild(createElement("button", {
+                                        className: "btn btn-sm btn-outline-success",
+                                        text: "Report Me Winner",
+                                        dataset: {
+                                            action: "report-tournament",
+                                            tournamentId: tournament.id,
+                                            matchId: match.id,
+                                            winner: walletState.address || ""
+                                        }
+                                    }));
+                                    reportRow.appendChild(createElement("button", {
+                                        className: "btn btn-sm btn-outline-warning",
+                                        text: "Report Opponent Winner",
+                                        dataset: {
+                                            action: "report-tournament",
+                                            tournamentId: tournament.id,
+                                            matchId: match.id,
+                                            winner: tournamentOpponentWallet(match) || ""
+                                        }
+                                    }));
+                                    matchCard.appendChild(reportRow);
                                 }
-                            </div>
-                        ` : ""}
-                    </div>
-                `).join("");
+                                roundBlock.appendChild(matchCard);
+                            });
+                            bracketView.appendChild(roundBlock);
+                        });
+                    }
+                    cardChildren.push(bracketView);
+                }
+
+                tournamentList.appendChild(createElement("div", { className: "arena-card" }, cardChildren));
+            });
         }
 
         async function refresh() {

@@ -3,7 +3,7 @@
 {% block title %}Crypto Hockey - Online Arena{% endblock %}
 
 {% block content %}
-<script id="initial-lobby-data" type="application/json">{{ initial_lobby|tojson }}</script>
+<script id="initial-lobby-data" type="application/json">{{ initial_lobby|tojson|safe }}</script>
 
 <div class="online-arena-container">
     <h1>♠️ GG Poker Style Online Arena</h1>
