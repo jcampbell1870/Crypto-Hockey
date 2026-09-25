@@ -124,7 +124,16 @@
             autoConnectPending = false;
             try
             {
-                await ConnectWalletInternalAsync(refreshEnvironment: true, allowDeepLinkFallback: false);
+                if (!MetaMaskInstalled && !WalletState.IsConnected)
+                {
+                    await Task.Delay(500);
+                    await RefreshWalletEnvironmentAsync();
+                }
+
+                if (MetaMaskInstalled || WalletState.IsConnected)
+                {
+                    await ConnectWalletInternalAsync(refreshEnvironment: false, allowDeepLinkFallback: false);
+                }
             }
             finally
             {

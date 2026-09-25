@@ -1,5 +1,6 @@
 @using Crypto_Hockey.Services
 @using Crypto_Hockey.Models
+@using Microsoft.AspNetCore.WebUtilities
 @page "/game"
 @rendermode InteractiveServer
 @implements IAsyncDisposable
@@ -125,13 +126,26 @@
 
     private CancellationTokenSource? gameLoopCts;
     private DateTime lastFrameTime = DateTime.UtcNow;
-    [SupplyParameterFromQuery(Name = "autoconnect")]
-    private bool? AutoConnectQuery { get; set; }
-
     [Inject] IGameService GameService { get; set; } = null!;
     [Inject] IJSRuntime JSRuntime { get; set; } = null!;
+    [Inject] NavigationManager NavigationManager { get; set; } = null!;
 
-    private bool AutoConnectWallet => AutoConnectQuery.GetValueOrDefault();
+    private bool AutoConnectWallet
+    {
+        get
+        {
+            var query = QueryHelpers.ParseQuery(new Uri(NavigationManager.Uri).Query);
+            if (!query.TryGetValue("autoconnect", out var values))
+            {
+                return false;
+            }
+
+            var value = values.Count > 0 ? values[0] : null;
+            return string.IsNullOrWhiteSpace(value)
+                || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "1", StringComparison.OrdinalIgnoreCase);
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
