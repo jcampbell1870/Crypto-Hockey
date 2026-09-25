@@ -57,19 +57,5 @@ window.gameRenderer = {
         ctx.fillText(gameState.playerScore, canvas.width / 4, 40);
         ctx.fillText(gameState.opponentScore, (canvas.width * 3) / 4, 40);
 
-        // Draw game status
-        if (gameState.gameOver) {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            ctx.fillStyle = gameState.winner === 'Player' ? '#4ecdc4' : '#e94560';
-            ctx.font = 'bold 48px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(gameState.winner === 'Player' ? 'YOU WIN!' : 'GAME OVER', canvas.width / 2, canvas.height / 2 - 20);
-
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 24px Arial';
-            ctx.fillText(`Final Score: ${gameState.playerScore} - ${gameState.opponentScore}`, canvas.width / 2, canvas.height / 2 + 30);
-        }
     }
 };

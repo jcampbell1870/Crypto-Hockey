@@ -79,7 +79,6 @@ public class GameService : IGameService
         if (session.PlayerWon)
         {
             player.TotalWins++;
-            player.TotalRewardsEarned += session.RewardAmount;
         }
         else
         {
@@ -159,6 +158,9 @@ public class GameService : IGameService
             session.TransactionHash = !string.IsNullOrWhiteSpace(rewardClaim.Payload?.Nonce)
                 ? $"issuer-claim:{rewardClaim.Payload.Nonce}"
                 : session.TransactionHash;
+            var player = await GetOrCreatePlayerAsync(session.PlayerAddress);
+            player.TotalRewardsEarned += session.RewardAmount;
+            _context.PlayerProfiles.Update(player);
             _context.GameSessions.Update(session);
             await _context.SaveChangesAsync();
             _logger.LogInformation("Reward claim package issued for session {SessionId}", sessionId);
