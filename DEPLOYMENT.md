@@ -328,8 +328,8 @@ $response.StatusCode # Should be 200
 $response = Invoke-WebRequest -Uri "https://www.cryptohockey.org/game" -UseBasicParsing
 $response.StatusCode # Should be 200
 
-# Test public site availability
-$response = Invoke-WebRequest -Uri "https://www.cryptohockey.org" -UseBasicParsing
+# Test Blazor boot asset
+$response = Invoke-WebRequest -Uri "https://www.cryptohockey.org/_framework/blazor.web.js" -UseBasicParsing
 $response.StatusCode # Should be 200
 ```
 

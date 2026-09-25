@@ -31,15 +31,6 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 var trustProxyTerminatedTls = builder.Configuration.GetValue<bool>("TRUST_PROXY_HEADERS_FROM_RENDER");
 
-if (trustProxyTerminatedTls)
-{
-    app.Use((context, next) =>
-    {
-        context.Request.Scheme = Uri.UriSchemeHttps;
-        return next();
-    });
-}
-
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
