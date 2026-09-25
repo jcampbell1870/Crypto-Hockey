@@ -1,4 +1,6 @@
-﻿@page "/"
+﻿@using Crypto_Hockey.Models
+@page "/"
+@rendermode InteractiveServer
 
 <PageTitle>Crypto Hockey</PageTitle>
 
@@ -37,6 +39,10 @@
                 Enter Online Arena
             </a>
         </div>
+
+        <div class="mt-4">
+            <WalletConnection @bind-WalletState="walletState" />
+        </div>
     </div>
 </div>
 
@@ -58,6 +64,7 @@
                     <p>Play solo vs AI, or enter online heads-up and tournament competition</p>
                 </div>
             </div>
+
             <div class="col-md-4">
                 <div class="step-card">
                     <div class="step-number">3</div>
@@ -65,6 +72,11 @@
                     <p>Beat the AI and claim your A1870 reward tokens</p>
                 </div>
             </div>
+
         </div>
     </div>
 </div>
+
+@code {
+    private WalletConnectionState walletState = new();
+}
