@@ -183,7 +183,7 @@ az webapp deployment source config-zip --resource-group MyResourceGroup --name c
 
 ### Docker / Render Deployment
 
-This repository includes a production `Dockerfile` at `/home/runner/work/Crypto-Hockey/Crypto-Hockey/Dockerfile` and a root Render blueprint at `/home/runner/work/Crypto-Hockey/Crypto-Hockey/render.yaml` configured with `runtime: docker`.
+This repository includes a production `Dockerfile` at `./Dockerfile` and a root Render blueprint at `./render.yaml` configured with `runtime: docker`.
 
 Build and run locally:
 
