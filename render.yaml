@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: crypto-hockey
+    runtime: dotnet
+    buildCommand: dotnet publish "Crypto Hockey.csproj" -c Release -o out
+    startCommand: dotnet out/Crypto_Hockey.dll
