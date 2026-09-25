@@ -7,6 +7,6 @@ services:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
       - key: AllowedHosts
-        value: cryptohockey.org;www.cryptohockey.org
+        value: cryptohockey.org;www.cryptohockey.org;crypto-hockey.onrender.com
       - key: TRUST_PROXY_HEADERS_FROM_RENDER
         value: "true"
