@@ -16,6 +16,9 @@ on:
       - "render.yaml"
       - ".github/workflows/dockerfile-path-check.yml"
 
+permissions:
+  contents: read
+
 jobs:
   verify-dockerfile-paths:
     runs-on: ubuntu-latest
@@ -32,3 +35,8 @@ jobs:
 
           [ -s "Dockerfile" ] || { echo "Dockerfile exists but is empty"; exit 1; }
           [ -s ".Dockerfile" ] || { echo ".Dockerfile exists but is empty"; exit 1; }
+
+          cmp -s "Dockerfile" ".Dockerfile" || {
+            echo "Dockerfile and .Dockerfile must remain identical to prevent deployment drift"
+            exit 1
+          }
