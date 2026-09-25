@@ -77,6 +77,7 @@
     private bool MetaMaskInstalled = false;
     private bool IsMobileDevice = false;
     private bool IsInAppBrowser = false;
+    private bool IsMetaMaskAppBrowser = false;
     private bool HasCheckedEnvironment = false;
 
     [Parameter]
@@ -109,7 +110,7 @@
             await RefreshWalletEnvironmentAsync();
         }
 
-        if (allowDeepLinkFallback && IsMobileDevice && (!MetaMaskInstalled || IsInAppBrowser))
+        if (allowDeepLinkFallback && IsMobileDevice && ((IsInAppBrowser) || (!MetaMaskInstalled && !IsMetaMaskAppBrowser)))
         {
             await OpenInMetaMaskApp();
             return false;
@@ -138,6 +139,7 @@
             MetaMaskInstalled = await JSRuntime.InvokeAsync<bool>("window.metamaskInterop.isMetaMaskInstalled");
             IsMobileDevice = await JSRuntime.InvokeAsync<bool>("window.metamaskInterop.isMobileDevice");
             IsInAppBrowser = await JSRuntime.InvokeAsync<bool>("window.metamaskInterop.isInAppBrowser");
+            IsMetaMaskAppBrowser = await JSRuntime.InvokeAsync<bool>("window.metamaskInterop.isMetaMaskAppBrowser");
             WalletState = await WalletService.GetWalletStateAsync();
         }
         catch
@@ -145,6 +147,7 @@
             MetaMaskInstalled = false;
             IsMobileDevice = false;
             IsInAppBrowser = false;
+            IsMetaMaskAppBrowser = false;
         }
 
         HasCheckedEnvironment = true;

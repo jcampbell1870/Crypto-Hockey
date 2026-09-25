@@ -2,6 +2,7 @@
 @using Crypto_Hockey.Models
 @using Microsoft.AspNetCore.WebUtilities
 @page "/game"
+@page "/game/autoconnect"
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 
@@ -134,7 +135,14 @@
     {
         get
         {
-            var query = QueryHelpers.ParseQuery(new Uri(NavigationManager.Uri).Query);
+            var currentUri = new Uri(NavigationManager.Uri);
+
+            if (string.Equals(currentUri.AbsolutePath, "/game/autoconnect", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            var query = QueryHelpers.ParseQuery(currentUri.Query);
             if (!query.TryGetValue("autoconnect", out var values))
             {
                 return false;

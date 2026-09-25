@@ -48,6 +48,11 @@ window.metamaskInterop = {
         return /(Twitter|FBAN|FBAV|Instagram|Line)/i.test(userAgent);
     },
 
+    isMetaMaskAppBrowser: function () {
+        const userAgent = navigator.userAgent || '';
+        return /MetaMaskMobile/i.test(userAgent);
+    },
+
     getMetaMaskDeepLink: function () {
         return this.getMetaMaskDeepLinkForUrl(window.location.href);
     },
@@ -68,7 +73,7 @@ window.metamaskInterop = {
     },
 
     openGameInMetaMask: function () {
-        const gameUrl = new URL('/game?autoconnect=true', window.location.origin).href;
+        const gameUrl = new URL('/game/autoconnect', window.location.origin).href;
 
         if (!this.isMobileDevice()) {
             window.location.assign(gameUrl);
