@@ -212,7 +212,7 @@ ConnectionStrings__DefaultConnection=your_connection_string
 ```
 
 Production defaults for the Cloudflare + Render deployment live in `appsettings.Production.json`, with `AllowedHosts` set to `cryptohockey.org`, `www.cryptohockey.org`, and `crypto-hockey.onrender.com` so MetaMask deep-link/browser flows can still reach the Render hostname.
-If `ConnectionStrings__DefaultConnection` is not set to a production-ready SQL Server connection string, the app now falls back to a local SQLite database file so wallet-connected gameplay can still create player profiles and game sessions on Render. Configure a managed SQL Server connection string when you need persistent production data across deploys.
+If `ConnectionStrings__DefaultConnection` is not set to a production-ready SQL Server connection string, the app now falls back to a local SQLite database file so wallet-connected gameplay can still create player profiles and game sessions on Render. The fallback database is recreated from the current model at startup, so configure a managed SQL Server connection string when you need persistent production data across restarts or deploys.
 
 ## 🧪 Testing
 

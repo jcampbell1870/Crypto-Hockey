@@ -77,12 +77,13 @@ app.MapRazorComponents<App>()
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<GameDbContext>();
-    if (dbContext.Database.GetMigrations().Any())
+    if (useSqlServer)
     {
         dbContext.Database.Migrate();
     }
     else
     {
+        dbContext.Database.EnsureDeleted();
         dbContext.Database.EnsureCreated();
     }
 }
