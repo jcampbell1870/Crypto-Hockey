@@ -54,9 +54,7 @@ window.metamaskInterop = {
 
     getMetaMaskDeepLinkForUrl: function (targetUrl) {
         const normalizedUrl = targetUrl.replace(/^https?:\/\//i, '');
-        const deepLink = new URL('https://link.metamask.io');
-        deepLink.pathname = `/dapp/${normalizedUrl}`;
-        return deepLink.toString();
+        return `https://link.metamask.io/dapp/${encodeURIComponent(normalizedUrl)}`;
     },
 
     openInMetaMask: function () {
