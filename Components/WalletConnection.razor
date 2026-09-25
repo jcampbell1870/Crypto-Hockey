@@ -79,7 +79,8 @@
     private bool IsInAppBrowser = false;
     private bool HasCheckedEnvironment = false;
     private bool autoConnectPending = false;
-    private bool autoConnectAttempted = false;
+    private int autoConnectAttempts = 0;
+    private const int MaxAutoConnectAttempts = 2;
 
     [Parameter]
     public EventCallback<WalletConnectionState> OnWalletConnected { get; set; }
@@ -95,7 +96,7 @@
 
     protected override void OnParametersSet()
     {
-        if (AutoConnect && !WalletState.IsConnected && !autoConnectAttempted)
+        if (AutoConnect && !WalletState.IsConnected && !autoConnectPending && autoConnectAttempts == 0)
         {
             autoConnectPending = true;
         }
@@ -111,11 +112,17 @@
             shouldRefreshUi = true;
         }
 
-        if (autoConnectPending && !autoConnectAttempted)
+        if (autoConnectPending && autoConnectAttempts < MaxAutoConnectAttempts)
         {
             autoConnectPending = false;
-            autoConnectAttempted = true;
+            autoConnectAttempts++;
             await ConnectWalletInternalAsync(refreshEnvironment: true, allowDeepLinkFallback: false);
+
+            if (!WalletState.IsConnected && autoConnectAttempts < MaxAutoConnectAttempts)
+            {
+                autoConnectPending = true;
+            }
+
             shouldRefreshUi = true;
         }
 
