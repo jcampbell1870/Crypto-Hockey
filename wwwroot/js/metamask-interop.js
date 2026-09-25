@@ -53,11 +53,10 @@ window.metamaskInterop = {
     },
 
     getMetaMaskDeepLinkForUrl: function (targetUrl) {
-        const parsedUrl = new URL(targetUrl, window.location.origin);
-        const hostAndPath = `${parsedUrl.host}${parsedUrl.pathname}`;
-        const queryAndFragment = `${parsedUrl.search}${parsedUrl.hash}`;
-        const encodedSuffix = queryAndFragment ? encodeURIComponent(queryAndFragment) : '';
-        return `https://link.metamask.io/dapp/${hostAndPath}${encodedSuffix}`;
+        const normalizedUrl = targetUrl.replace(/^https?:\/\//i, '');
+        const deepLink = new URL('https://link.metamask.io');
+        deepLink.pathname = `/dapp/${normalizedUrl}`;
+        return deepLink.toString();
     },
 
     openInMetaMask: function () {
