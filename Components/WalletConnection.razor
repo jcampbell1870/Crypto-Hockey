@@ -15,7 +15,7 @@
                 <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' width='20' height='20'%3E%3Cpath fill='%23F6851B' d='M174 29l-24 6V8l24 21z'/%3E%3Cpath fill='%23763D16' d='M26 29L50 8v27L26 29z'/%3E%3Cpath fill='%23F6851B' d='M157 67l15-7-15 37v-30z'/%3E%3Cpath fill='%23763D16' d='M43 67L28 60l15 37v-30z'/%3E%3C/svg%3E" alt="MetaMask" /> 
                 Connect MetaMask
             </button>
-            @if (!MetaMaskInstalled)
+            @if (HasCheckedEnvironment && !MetaMaskInstalled)
             {
                 <p class="warning-text">
                     MetaMask was not detected in this browser.
@@ -77,6 +77,7 @@
     private bool MetaMaskInstalled = false;
     private bool IsMobileDevice = false;
     private bool IsInAppBrowser = false;
+    private bool HasCheckedEnvironment = false;
 
     [Parameter]
     public EventCallback<WalletConnectionState> OnWalletConnected { get; set; }
@@ -87,28 +88,22 @@
     [Parameter]
     public EventCallback<WalletConnectionState> WalletStateChanged { get; set; }
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // Check if MetaMask is installed by calling the JS function
-        try
+        if (!firstRender)
         {
-            MetaMaskInstalled = await JSRuntime.InvokeAsync<bool>("window.metamaskInterop.isMetaMaskInstalled");
-            IsMobileDevice = await JSRuntime.InvokeAsync<bool>("window.metamaskInterop.isMobileDevice");
-            IsInAppBrowser = await JSRuntime.InvokeAsync<bool>("window.metamaskInterop.isInAppBrowser");
-            // Try to get existing connection state
-            WalletState = await WalletService.GetWalletStateAsync();
+            return;
         }
-        catch
-        {
-            MetaMaskInstalled = false;
-            IsMobileDevice = false;
-            IsInAppBrowser = false;
-        }
+
+        await RefreshWalletEnvironmentAsync();
+        StateHasChanged();
     }
 
     private async Task ConnectWallet()
     {
-        if (!MetaMaskInstalled && IsMobileDevice)
+        await RefreshWalletEnvironmentAsync();
+
+        if (IsMobileDevice && (!MetaMaskInstalled || IsInAppBrowser))
         {
             await OpenInMetaMaskApp();
             return;
@@ -122,6 +117,25 @@
     private async Task OpenInMetaMaskApp()
     {
         await JSRuntime.InvokeAsync<bool>("window.metamaskInterop.openInMetaMask");
+    }
+
+    private async Task RefreshWalletEnvironmentAsync()
+    {
+        try
+        {
+            MetaMaskInstalled = await JSRuntime.InvokeAsync<bool>("window.metamaskInterop.isMetaMaskInstalled");
+            IsMobileDevice = await JSRuntime.InvokeAsync<bool>("window.metamaskInterop.isMobileDevice");
+            IsInAppBrowser = await JSRuntime.InvokeAsync<bool>("window.metamaskInterop.isInAppBrowser");
+            WalletState = await WalletService.GetWalletStateAsync();
+        }
+        catch
+        {
+            MetaMaskInstalled = false;
+            IsMobileDevice = false;
+            IsInAppBrowser = false;
+        }
+
+        HasCheckedEnvironment = true;
     }
 
     private async Task DisconnectWallet()
