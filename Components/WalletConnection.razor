@@ -78,6 +78,8 @@
     private bool IsMobileDevice = false;
     private bool IsInAppBrowser = false;
     private bool HasCheckedEnvironment = false;
+    private bool autoConnectPending = false;
+    private bool autoConnectAttempted = false;
 
     [Parameter]
     public EventCallback<WalletConnectionState> OnWalletConnected { get; set; }
@@ -91,21 +93,36 @@
     [Parameter]
     public bool AutoConnect { get; set; }
 
+    protected override void OnParametersSet()
+    {
+        if (AutoConnect && !WalletState.IsConnected && !autoConnectAttempted)
+        {
+            autoConnectPending = true;
+        }
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender)
+        var shouldRefreshUi = false;
+
+        if (firstRender)
         {
-            return;
+            await RefreshWalletEnvironmentAsync();
+            shouldRefreshUi = true;
         }
 
-        await RefreshWalletEnvironmentAsync();
-
-        if (AutoConnect && !WalletState.IsConnected)
+        if (autoConnectPending && !autoConnectAttempted)
         {
+            autoConnectPending = false;
+            autoConnectAttempted = true;
             await ConnectWalletInternalAsync(refreshEnvironment: true, allowDeepLinkFallback: false);
+            shouldRefreshUi = true;
         }
 
-        StateHasChanged();
+        if (shouldRefreshUi)
+        {
+            StateHasChanged();
+        }
     }
 
     private async Task ConnectWallet()
