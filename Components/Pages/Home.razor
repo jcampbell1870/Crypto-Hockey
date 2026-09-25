@@ -9,6 +9,16 @@
         <h1 class="display-4">🏒 Crypto Hockey</h1>
         <p class="lead">The classic game of air hockey, powered by blockchain rewards!</p>
 
+        <div class="homepage-wallet-entry">
+            <button class="btn btn-primary btn-lg wallet-launch-btn"
+                    @onclick="OpenGameWithMetaMask"
+                    aria-describedby="homepage-wallet-launch-help"
+                    aria-label="Connect MetaMask and open Crypto Hockey. On mobile this opens the game in the MetaMask app browser.">
+                Connect MetaMask &amp; Play
+            </button>
+            <p class="wallet-launch-help" id="homepage-wallet-launch-help">Open the game, connect MetaMask, and start playing right away.</p>
+        </div>
+
         <div class="feature-highlights">
             <div class="feature-card">
                 <h3>⚡ Play & Earn</h3>
@@ -27,28 +37,6 @@
                 <p>Shared Arcade1870 reward vault + issuer payout flow aligned with Crypto Chess</p>
             </div>
         </div>
-
-        <div class="cta-buttons">
-            <a href="/game" class="btn btn-primary btn-lg">
-                Start Playing Now
-            </a>
-            <a href="/leaderboard" class="btn btn-outline-primary btn-lg">
-                View Leaderboard
-            </a>
-            <a href="/online" class="btn btn-outline-primary btn-lg">
-                Enter Online Arena
-            </a>
-        </div>
-
-        <div class="mt-4 homepage-wallet-entry">
-            <button class="btn btn-primary btn-lg wallet-launch-btn"
-                    @onclick="OpenGameWithMetaMask"
-                    aria-describedby="homepage-wallet-launch-help"
-                    aria-label="Connect MetaMask and open Crypto Hockey. On mobile this opens the game in the MetaMask app browser.">
-                Connect MetaMask &amp; Play
-            </button>
-            <p class="wallet-launch-help" id="homepage-wallet-launch-help">On mobile, this opens Crypto Hockey directly in the MetaMask app browser so you can connect, play, and claim rewards.</p>
-        </div>
     </div>
 </div>
 
@@ -66,8 +54,8 @@
             <div class="col-md-4">
                 <div class="step-card">
                     <div class="step-number">2</div>
-                    <h4>Choose Mode</h4>
-                    <p>Play solo vs AI, or enter online heads-up and tournament competition</p>
+                    <h4>Open the Game</h4>
+                    <p>Use the button at the top of the page to jump straight into Crypto Hockey</p>
                 </div>
             </div>
 
