@@ -50,7 +50,7 @@ window.metamaskInterop = {
 
     getMetaMaskDeepLink: function () {
         const currentUrl = window.location.href.replace(/^https?:\/\//i, '');
-        return `https://metamask.app.link/dapp/${encodeURI(currentUrl)}`;
+        return `https://link.metamask.io/dapp/${encodeURI(currentUrl)}`;
     },
 
     openInMetaMask: function () {
@@ -58,7 +58,8 @@ window.metamaskInterop = {
             return false;
         }
 
-        window.location.href = this.getMetaMaskDeepLink();
+        const deepLink = this.getMetaMaskDeepLink();
+        window.location.assign(deepLink);
         return true;
     },
 
