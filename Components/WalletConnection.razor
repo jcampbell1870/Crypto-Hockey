@@ -79,8 +79,7 @@
     private bool IsInAppBrowser = false;
     private bool HasCheckedEnvironment = false;
     private bool autoConnectPending = false;
-    private int autoConnectAttempts = 0;
-    private const int MaxAutoConnectAttempts = 2;
+    private bool autoConnectAttempted = false;
     private bool? lastAutoConnectValue = null;
 
     [Parameter]
@@ -100,11 +99,11 @@
         if (lastAutoConnectValue != AutoConnect)
         {
             autoConnectPending = false;
-            autoConnectAttempts = 0;
+            autoConnectAttempted = false;
             lastAutoConnectValue = AutoConnect;
         }
 
-        if (AutoConnect && !WalletState.IsConnected && !autoConnectPending && autoConnectAttempts == 0)
+        if (AutoConnect && !WalletState.IsConnected && !autoConnectPending && !autoConnectAttempted)
         {
             autoConnectPending = true;
         }
@@ -120,17 +119,11 @@
             shouldRefreshUi = true;
         }
 
-        if (autoConnectPending && autoConnectAttempts < MaxAutoConnectAttempts)
+        if (autoConnectPending && !autoConnectAttempted)
         {
             autoConnectPending = false;
-            autoConnectAttempts++;
-            var connected = await ConnectWalletInternalAsync(refreshEnvironment: true, allowDeepLinkFallback: false);
-
-            if (!connected && autoConnectAttempts < MaxAutoConnectAttempts)
-            {
-                autoConnectPending = true;
-            }
-
+            await ConnectWalletInternalAsync(refreshEnvironment: true, allowDeepLinkFallback: false);
+            autoConnectAttempted = true;
             shouldRefreshUi = true;
         }
 
