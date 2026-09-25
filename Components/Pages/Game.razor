@@ -137,6 +137,7 @@
     [Inject] IGameService GameService { get; set; } = null!;
     [Inject] IJSRuntime JSRuntime { get; set; } = null!;
     [Inject] NavigationManager NavigationManager { get; set; } = null!;
+    [Inject] ILogger<Game> Logger { get; set; } = null!;
 
     private bool AutoConnectWallet
     {
@@ -216,7 +217,7 @@
             gameRunning = false;
             currentSessionId = null;
             gameErrorMessage = "Unable to start the game right now. Please try again in a moment.";
-            Console.WriteLine($"Error starting game: {ex.Message}");
+            Logger.LogError(ex, "Error starting game for wallet {WalletAddress}", currentWalletState.Address);
         }
 
         StateHasChanged();
@@ -341,7 +342,7 @@
             catch (Exception ex)
             {
                 gameErrorMessage = "Reward claim failed. Please try again shortly.";
-                Console.WriteLine($"Error claiming reward: {ex.Message}");
+                Logger.LogError(ex, "Error claiming reward for session {SessionId}", currentSessionId);
             }
 
             StateHasChanged();

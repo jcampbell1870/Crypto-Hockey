@@ -3,6 +3,7 @@ using Crypto_Hockey.Data;
 using Crypto_Hockey.Models;
 using Crypto_Hockey.Services;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -76,7 +77,14 @@ app.MapRazorComponents<App>()
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<GameDbContext>();
-    dbContext.Database.EnsureCreated();
+    if (dbContext.Database.GetMigrations().Any())
+    {
+        dbContext.Database.Migrate();
+    }
+    else
+    {
+        dbContext.Database.EnsureCreated();
+    }
 }
 
 app.Run();
