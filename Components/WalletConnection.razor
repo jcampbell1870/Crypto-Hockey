@@ -102,13 +102,18 @@
 
         if (AutoConnect && !WalletState.IsConnected && MetaMaskInstalled)
         {
-            await ConnectWallet(allowDeepLinkFallback: false);
+            await ConnectWalletInternalAsync(allowDeepLinkFallback: false);
         }
 
         StateHasChanged();
     }
 
-    private async Task ConnectWallet(bool allowDeepLinkFallback = true)
+    private async Task ConnectWallet()
+    {
+        await ConnectWalletInternalAsync();
+    }
+
+    private async Task ConnectWalletInternalAsync(bool allowDeepLinkFallback = true)
     {
         if (allowDeepLinkFallback)
         {
