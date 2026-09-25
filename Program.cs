@@ -2,21 +2,9 @@ using Crypto_Hockey.Components;
 using Crypto_Hockey.Data;
 using Crypto_Hockey.Models;
 using Crypto_Hockey.Services;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
-
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-
-    if (builder.Configuration.GetValue<bool>("TRUST_PROXY_HEADERS_FROM_RENDER"))
-    {
-        options.KnownIPNetworks.Clear();
-        options.KnownProxies.Clear();
-    }
-});
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -41,7 +29,7 @@ builder.Services.AddSingleton<IOnlineCompetitionService, OnlineCompetitionServic
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-app.UseForwardedHeaders();
+var trustProxyTerminatedTls = builder.Configuration.GetValue<bool>("TRUST_PROXY_HEADERS_FROM_RENDER");
 
 if (!app.Environment.IsDevelopment())
 {
@@ -50,7 +38,11 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
+
+if (!trustProxyTerminatedTls)
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAntiforgery();
 
