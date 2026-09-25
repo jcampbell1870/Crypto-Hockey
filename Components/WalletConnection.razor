@@ -141,6 +141,13 @@
                 }
             }
 
+            if (!MetaMaskInstalled && !WalletState.IsConnected)
+            {
+                autoConnectAttempted = true;
+                StateHasChanged();
+                return;
+            }
+
             try
             {
                 await ConnectWalletInternalAsync(refreshEnvironment: false, allowDeepLinkFallback: false);
