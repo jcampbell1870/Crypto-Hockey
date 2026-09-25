@@ -328,7 +328,7 @@ $response.StatusCode # Should be 200
 $response = Invoke-WebRequest -Uri "https://www.cryptohockey.org/game" -UseBasicParsing
 $response.StatusCode # Should be 200
 
-# Test API health
+# Test public site availability
 $response = Invoke-WebRequest -Uri "https://www.cryptohockey.org" -UseBasicParsing
 $response.StatusCode # Should be 200
 ```

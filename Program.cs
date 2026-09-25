@@ -3,7 +3,6 @@ using Crypto_Hockey.Data;
 using Crypto_Hockey.Models;
 using Crypto_Hockey.Services;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,15 +17,6 @@ builder.Services.Configure<BlockchainConfig>(
 // Add database context
 builder.Services.AddDbContext<GameDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
-        | ForwardedHeaders.XForwardedProto
-        | ForwardedHeaders.XForwardedHost;
-    options.KnownIPNetworks.Clear();
-    options.KnownProxies.Clear();
-});
 
 // Register services
 builder.Services.AddScoped<IWalletService, WalletService>();
@@ -43,7 +33,11 @@ var trustProxyTerminatedTls = builder.Configuration.GetValue<bool>("TRUST_PROXY_
 
 if (trustProxyTerminatedTls)
 {
-    app.UseForwardedHeaders();
+    app.Use((context, next) =>
+    {
+        context.Request.Scheme = Uri.UriSchemeHttps;
+        return next();
+    });
 }
 
 if (!app.Environment.IsDevelopment())
