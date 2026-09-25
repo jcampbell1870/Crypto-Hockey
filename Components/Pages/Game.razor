@@ -1,5 +1,6 @@
 @using Crypto_Hockey.Services
 @using Crypto_Hockey.Models
+@using Microsoft.AspNetCore.WebUtilities
 @page "/game"
 @rendermode InteractiveServer
 @implements IAsyncDisposable
@@ -125,9 +126,26 @@
 
     private CancellationTokenSource? gameLoopCts;
     private DateTime lastFrameTime = DateTime.UtcNow;
-
     [Inject] IGameService GameService { get; set; } = null!;
     [Inject] IJSRuntime JSRuntime { get; set; } = null!;
+    [Inject] NavigationManager NavigationManager { get; set; } = null!;
+
+    private bool AutoConnectWallet
+    {
+        get
+        {
+            var query = QueryHelpers.ParseQuery(new Uri(NavigationManager.Uri).Query);
+            if (!query.TryGetValue("autoconnect", out var values))
+            {
+                return false;
+            }
+
+            var value = values.Count > 0 ? values[0] : null;
+            return string.IsNullOrWhiteSpace(value)
+                || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "1", StringComparison.OrdinalIgnoreCase);
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -136,9 +154,17 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && canvasRef.Context == null)
+        if (firstRender)
         {
-            // Canvas will be initialized when game starts
+            if (AutoConnectWallet && walletComponent is not null && !currentWalletState.IsConnected)
+            {
+                await walletComponent.ConnectForLaunchAsync();
+            }
+
+            if (canvasRef.Context == null)
+            {
+                // Canvas will be initialized when game starts
+            }
         }
     }
 

@@ -90,28 +90,40 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender)
+        if (firstRender)
         {
-            return;
+            await RefreshWalletEnvironmentAsync();
+            StateHasChanged();
         }
-
-        await RefreshWalletEnvironmentAsync();
-        StateHasChanged();
     }
 
     private async Task ConnectWallet()
     {
-        await RefreshWalletEnvironmentAsync();
+        await ConnectWalletInternalAsync();
+    }
 
-        if (IsMobileDevice && (!MetaMaskInstalled || IsInAppBrowser))
+    private async Task<bool> ConnectWalletInternalAsync(bool refreshEnvironment = true, bool allowDeepLinkFallback = true)
+    {
+        if (refreshEnvironment)
+        {
+            await RefreshWalletEnvironmentAsync();
+        }
+
+        if (allowDeepLinkFallback && IsMobileDevice && (!MetaMaskInstalled || IsInAppBrowser))
         {
             await OpenInMetaMaskApp();
-            return;
+            return false;
         }
 
         WalletState = await WalletService.ConnectWalletAsync();
         await PublishWalletStateAsync();
         StateHasChanged();
+        return WalletState.IsConnected;
+    }
+
+    public async Task ConnectForLaunchAsync()
+    {
+        await ConnectWalletInternalAsync();
     }
 
     private async Task OpenInMetaMaskApp()
