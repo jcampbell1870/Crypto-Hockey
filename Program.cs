@@ -207,5 +207,8 @@ static async Task EnsureSqliteColumnExistsAsync(
     }
 
     await reader.DisposeAsync();
-    await dbContext.Database.ExecuteSqlRawAsync($"ALTER TABLE \"{tableName}\" ADD COLUMN {columnDefinition};");
+
+    await using var alterCommand = dbContext.Database.GetDbConnection().CreateCommand();
+    alterCommand.CommandText = $"ALTER TABLE \"{tableName}\" ADD COLUMN {columnDefinition};";
+    await alterCommand.ExecuteNonQueryAsync();
 }
