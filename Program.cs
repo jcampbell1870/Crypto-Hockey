@@ -11,7 +11,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
 
-    if (builder.Configuration.GetValue<bool>("Render:TrustProxyHeaders"))
+    if (builder.Configuration.GetValue<bool>("TRUST_PROXY_HEADERS_FROM_RENDER"))
     {
         options.KnownIPNetworks.Clear();
         options.KnownProxies.Clear();

@@ -4,5 +4,5 @@ services:
     runtime: docker
     dockerFilePath: ./Dockerfile
     envVars:
-      - key: Render__TrustProxyHeaders
+      - key: TRUST_PROXY_HEADERS_FROM_RENDER
         value: "true"
