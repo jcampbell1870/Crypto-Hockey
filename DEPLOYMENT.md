@@ -199,7 +199,7 @@ az webapp deployment source config-zip \
 	  "Microsoft.AspNetCore": "Error"
 	}
   },
-  "AllowedHosts": "cryptohockey.org;www.cryptohockey.org",
+  "AllowedHosts": "cryptohockey.org;www.cryptohockey.org;crypto-hockey.onrender.com",
   "BlockchainConfig": {
 	"Arcade1870ContractAddress": "0x8eddD4edea39c5B5f77662453600F53A202EE47C",
 	"RewardAmount": "10",
