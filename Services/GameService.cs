@@ -136,9 +136,7 @@ public class GameService : IGameService
     public async Task<bool> ClaimRewardAsync(int sessionId)
     {
         var session = await _context.GameSessions.FindAsync(sessionId);
-        var rewardWasAlreadyClaimed = session?.RewardClaimed ?? false;
-
-        if (session == null || rewardWasAlreadyClaimed || !session.PlayerWon)
+        if (session == null || session.RewardClaimed || !session.PlayerWon)
             return false;
 
         var rewardClaim = await _blockchainService.RequestRewardClaimAsync(
@@ -156,20 +154,42 @@ public class GameService : IGameService
 
         if (rewardClaim.IsSuccessful)
         {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            await _context.Entry(session).ReloadAsync();
+
+            if (session.RewardClaimed)
+            {
+                await transaction.CommitAsync();
+                return true;
+            }
+
             session.RewardClaimed = true;
             session.TransactionHash = !string.IsNullOrWhiteSpace(rewardClaim.Payload?.Nonce)
                 ? $"issuer-claim:{rewardClaim.Payload.Nonce}"
                 : session.TransactionHash;
+            var player = await _context.PlayerProfiles
+                .FirstOrDefaultAsync(p => p.WalletAddress == session.PlayerAddress);
 
-            if (!rewardWasAlreadyClaimed && session.RewardAmount > 0)
+            if (player == null)
             {
-                var player = await GetOrCreatePlayerAsync(session.PlayerAddress);
-                player.TotalRewardsEarned += session.RewardAmount;
-                _context.PlayerProfiles.Update(player);
+                player = new PlayerProfile
+                {
+                    WalletAddress = session.PlayerAddress,
+                    CreatedAt = DateTime.UtcNow,
+                    LastPlayedAt = session.EndedAt,
+                    TotalGames = 0,
+                    TotalWins = 0,
+                    TotalLosses = 0,
+                    TotalRewardsEarned = 0
+                };
+
+                _context.PlayerProfiles.Add(player);
             }
 
+            player.TotalRewardsEarned += session.RewardAmount;
             _context.GameSessions.Update(session);
             await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
             _logger.LogInformation("Reward claim package issued for session {SessionId}", sessionId);
         }
         else
