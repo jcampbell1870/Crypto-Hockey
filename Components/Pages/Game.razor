@@ -265,7 +265,7 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error in game loop: {ex.Message}");
+            Logger.LogError(ex, "Error in game loop for session {SessionId}", currentSessionId);
         }
     }
 
