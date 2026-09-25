@@ -45,7 +45,7 @@ window.metamaskInterop = {
 
     isInAppBrowser: function () {
         const userAgent = navigator.userAgent || '';
-        return /(Twitter|FBAN|FBAV|Instagram|Line|wv)/i.test(userAgent);
+        return /(Twitter|FBAN|FBAV|Instagram|Line)/i.test(userAgent);
     },
 
     getMetaMaskDeepLink: function () {
@@ -54,7 +54,7 @@ window.metamaskInterop = {
 
     getMetaMaskDeepLinkForUrl: function (targetUrl) {
         const normalizedUrl = targetUrl.replace(/^https?:\/\//i, '');
-        return `https://link.metamask.io/dapp/${encodeURI(normalizedUrl)}`;
+        return `https://link.metamask.io/dapp/${encodeURIComponent(normalizedUrl)}`;
     },
 
     openInMetaMask: function () {
