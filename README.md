@@ -181,29 +181,18 @@ dotnet publish -c Release
 az webapp deployment source config-zip --resource-group MyResourceGroup --name crypto-hockey-app --src bin/Release/net10.0/publish.zip
 ```
 
-### Docker Deployment
+### Docker / Render Deployment
 
-Create `Dockerfile`:
+This repository includes a production `Dockerfile` at `/home/runner/work/Crypto-Hockey/Crypto-Hockey/Dockerfile` and a root Render blueprint at `/home/runner/work/Crypto-Hockey/Crypto-Hockey/render.yaml` configured with `runtime: docker`.
 
-```dockerfile
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-WORKDIR /app
-COPY . .
-RUN dotnet publish -c Release -o out
-
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
-WORKDIR /app
-COPY --from=build /app/out .
-EXPOSE 80
-ENTRYPOINT ["dotnet", "Crypto_Hockey.dll"]
-```
-
-Build and run:
+Build and run locally:
 
 ```bash
 docker build -t crypto-hockey .
-docker run -p 80:80 crypto-hockey
+docker run -e PORT=10000 -p 10000:10000 crypto-hockey
 ```
+
+On Render, create the web service from the repository blueprint or configure the service to use Docker so Render builds from the root `Dockerfile`.
 
 ## 🔧 Configuration
 
