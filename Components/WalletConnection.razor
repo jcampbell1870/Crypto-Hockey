@@ -17,7 +17,28 @@
             </button>
             @if (!MetaMaskInstalled)
             {
-                <p class="warning-text">MetaMask is not installed. <a href="https://metamask.io" target="_blank">Download MetaMask</a></p>
+                <p class="warning-text">
+                    MetaMask was not detected in this browser.
+                    @if (IsMobileDevice)
+                    {
+                        <span> Open this link in the MetaMask app browser.</span>
+                    }
+                    else
+                    {
+                        <span> <a href="https://metamask.io" target="_blank">Install MetaMask</a> and reload.</span>
+                    }
+                </p>
+
+                @if (IsMobileDevice)
+                {
+                    <button class="btn btn-outline-info mt-2" @onclick="OpenInMetaMaskApp">
+                        Open in MetaMask App
+                    </button>
+                    @if (IsInAppBrowser)
+                    {
+                        <p class="warning-text mt-2">X/Twitter in-app browsers often block wallet injection. Opening this game in MetaMask should fix connection.</p>
+                    }
+                }
             }
         </div>
     }
@@ -54,6 +75,8 @@
 
 @code {
     private bool MetaMaskInstalled = false;
+    private bool IsMobileDevice = false;
+    private bool IsInAppBrowser = false;
 
     [Parameter]
     public EventCallback<WalletConnectionState> OnWalletConnected { get; set; }
@@ -70,20 +93,35 @@
         try
         {
             MetaMaskInstalled = await JSRuntime.InvokeAsync<bool>("window.metamaskInterop.isMetaMaskInstalled");
+            IsMobileDevice = await JSRuntime.InvokeAsync<bool>("window.metamaskInterop.isMobileDevice");
+            IsInAppBrowser = await JSRuntime.InvokeAsync<bool>("window.metamaskInterop.isInAppBrowser");
             // Try to get existing connection state
             WalletState = await WalletService.GetWalletStateAsync();
         }
         catch
         {
             MetaMaskInstalled = false;
+            IsMobileDevice = false;
+            IsInAppBrowser = false;
         }
     }
 
     private async Task ConnectWallet()
     {
+        if (!MetaMaskInstalled && IsMobileDevice)
+        {
+            await OpenInMetaMaskApp();
+            return;
+        }
+
         WalletState = await WalletService.ConnectWalletAsync();
         await PublishWalletStateAsync();
         StateHasChanged();
+    }
+
+    private async Task OpenInMetaMaskApp()
+    {
+        await JSRuntime.InvokeAsync<bool>("window.metamaskInterop.openInMetaMask");
     }
 
     private async Task DisconnectWallet()

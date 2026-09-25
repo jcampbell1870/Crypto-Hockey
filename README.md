@@ -18,7 +18,7 @@ A modern, interactive web-based air hockey game built with Blazor, featuring Met
 
 - .NET 10 SDK
 - Visual Studio 2026 Community or later (or VS Code with C# extensions)
-- MetaMask browser extension (for wallet connection)
+- MetaMask browser extension (desktop) or MetaMask mobile app browser (mobile)
 - SQL Server LocalDB (for local development)
 
 ## 🚀 Getting Started
@@ -236,6 +236,7 @@ dotnet test
 - Ensure MetaMask extension is installed and enabled
 - Check browser console for JS errors
 - Clear browser cache and reload
+- On mobile, open the game inside the MetaMask app browser (X/Twitter in-app browsers often block wallet injection)
 
 ### Database Errors
 - Run `dotnet ef database update` to create schema
