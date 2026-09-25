@@ -336,7 +336,7 @@
             rewardStatusMessage = "Starting your reward payout...";
             await InvokeAsync(StateHasChanged);
 
-            bool success = await GameService.ClaimRewardAsync(currentSessionId.Value);
+            bool success = await GameService.ClaimRewardAsync(currentSessionId.Value, currentWalletState.Address!);
             if (success)
             {
                 rewardClaimed = true;
