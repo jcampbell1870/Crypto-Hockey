@@ -100,7 +100,7 @@
 
         await RefreshWalletEnvironmentAsync();
 
-        if (AutoConnect && !WalletState.IsConnected && MetaMaskInstalled)
+        if (AutoConnect && !WalletState.IsConnected)
         {
             await ConnectWalletInternalAsync(allowDeepLinkFallback: false);
         }
