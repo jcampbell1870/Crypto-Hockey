@@ -65,9 +65,6 @@
                 </div>
             </div>
 
-            @code {
-                private WalletConnectionState walletState = new();
-            }
             <div class="col-md-4">
                 <div class="step-card">
                     <div class="step-number">3</div>
@@ -75,6 +72,11 @@
                     <p>Beat the AI and claim your A1870 reward tokens</p>
                 </div>
             </div>
+
         </div>
     </div>
 </div>
+
+@code {
+    private WalletConnectionState walletState = new();
+}
