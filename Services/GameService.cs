@@ -63,10 +63,7 @@ public class GameService : IGameService
         session.OpponentScore = opponentScore;
         session.PlayerWon = playerScore > opponentScore;
 
-        if (session.PlayerWon)
-        {
-            session.RewardAmount = ParseConfiguredRewardAmount();
-        }
+        session.RewardAmount = ParseConfiguredRewardAmount();
 
         _context.GameSessions.Update(session);
         await _context.SaveChangesAsync();
@@ -136,7 +133,7 @@ public class GameService : IGameService
     public async Task<bool> ClaimRewardAsync(int sessionId)
     {
         var session = await _context.GameSessions.FindAsync(sessionId);
-        if (session == null || session.RewardClaimed || !session.PlayerWon)
+        if (session == null || session.RewardClaimed)
             return false;
 
         var rewardClaim = await _blockchainService.RequestRewardClaimAsync(
