@@ -122,8 +122,15 @@
         if (autoConnectPending && !autoConnectAttempted)
         {
             autoConnectPending = false;
-            await ConnectWalletInternalAsync(refreshEnvironment: true, allowDeepLinkFallback: false);
-            autoConnectAttempted = true;
+            try
+            {
+                await ConnectWalletInternalAsync(refreshEnvironment: true, allowDeepLinkFallback: false);
+            }
+            finally
+            {
+                autoConnectAttempted = true;
+            }
+
             shouldRefreshUi = true;
         }
 
