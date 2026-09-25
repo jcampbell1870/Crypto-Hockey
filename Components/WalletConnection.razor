@@ -78,11 +78,6 @@
     private bool IsMobileDevice = false;
     private bool IsInAppBrowser = false;
     private bool HasCheckedEnvironment = false;
-    private bool autoConnectPending = false;
-    private bool autoConnectAttempted = false;
-    private int autoConnectProviderChecks = 0;
-    private const int MaxAutoConnectProviderChecks = 4;
-    private bool? lastAutoConnectValue = null;
 
     [Parameter]
     public EventCallback<WalletConnectionState> OnWalletConnected { get; set; }
@@ -93,75 +88,11 @@
     [Parameter]
     public EventCallback<WalletConnectionState> WalletStateChanged { get; set; }
 
-    [Parameter]
-    public bool AutoConnect { get; set; }
-
-    protected override void OnParametersSet()
-    {
-        if (lastAutoConnectValue != AutoConnect)
-        {
-            autoConnectPending = false;
-            autoConnectAttempted = false;
-            autoConnectProviderChecks = 0;
-            lastAutoConnectValue = AutoConnect;
-        }
-
-        if (AutoConnect && !WalletState.IsConnected && !autoConnectPending && !autoConnectAttempted)
-        {
-            autoConnectPending = true;
-        }
-    }
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        var shouldRefreshUi = false;
-
         if (firstRender)
         {
             await RefreshWalletEnvironmentAsync();
-            shouldRefreshUi = true;
-        }
-
-        if (autoConnectPending && !autoConnectAttempted)
-        {
-            autoConnectPending = false;
-
-            if (!MetaMaskInstalled && !WalletState.IsConnected && autoConnectProviderChecks < MaxAutoConnectProviderChecks)
-            {
-                autoConnectProviderChecks++;
-                await Task.Delay(500);
-                await RefreshWalletEnvironmentAsync();
-
-                if (!MetaMaskInstalled && !WalletState.IsConnected)
-                {
-                    autoConnectPending = autoConnectProviderChecks < MaxAutoConnectProviderChecks;
-                    autoConnectAttempted = autoConnectProviderChecks >= MaxAutoConnectProviderChecks;
-                    StateHasChanged();
-                    return;
-                }
-            }
-
-            if (!MetaMaskInstalled && !WalletState.IsConnected)
-            {
-                autoConnectAttempted = true;
-                StateHasChanged();
-                return;
-            }
-
-            try
-            {
-                await ConnectWalletInternalAsync(refreshEnvironment: false, allowDeepLinkFallback: false);
-            }
-            finally
-            {
-                autoConnectAttempted = true;
-            }
-
-            shouldRefreshUi = true;
-        }
-
-        if (shouldRefreshUi)
-        {
             StateHasChanged();
         }
     }
@@ -188,6 +119,11 @@
         await PublishWalletStateAsync();
         StateHasChanged();
         return WalletState.IsConnected;
+    }
+
+    public async Task ConnectForLaunchAsync()
+    {
+        await ConnectWalletInternalAsync();
     }
 
     private async Task OpenInMetaMaskApp()

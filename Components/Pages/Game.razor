@@ -9,7 +9,7 @@
 
 <div class="game-container">
     <div class="game-sidebar">
-        <WalletConnection @ref="walletComponent" @bind-WalletState="currentWalletState" AutoConnect="@AutoConnectWallet" />
+        <WalletConnection @ref="walletComponent" @bind-WalletState="currentWalletState" />
 
         <div class="game-stats">
             <h4>Game Stats</h4>
@@ -154,9 +154,17 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && canvasRef.Context == null)
+        if (firstRender)
         {
-            // Canvas will be initialized when game starts
+            if (AutoConnectWallet && walletComponent is not null && !currentWalletState.IsConnected)
+            {
+                await walletComponent.ConnectForLaunchAsync();
+            }
+
+            if (canvasRef.Context == null)
+            {
+                // Canvas will be initialized when game starts
+            }
         }
     }
 
