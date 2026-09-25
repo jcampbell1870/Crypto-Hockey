@@ -12,7 +12,7 @@ public interface IGameService
     Task<PlayerProfile> GetOrCreatePlayerAsync(string walletAddress);
     Task<List<GameSession>> GetPlayerGameHistoryAsync(string walletAddress, int limit = 10);
     Task<List<PlayerProfile>> GetLeaderboardAsync(int limit = 10);
-    Task<bool> ClaimRewardAsync(int sessionId);
+    Task<bool> ClaimRewardAsync(int sessionId, string playerAddress);
 }
 
 public class GameService : IGameService
@@ -63,10 +63,7 @@ public class GameService : IGameService
         session.OpponentScore = opponentScore;
         session.PlayerWon = playerScore > opponentScore;
 
-        if (session.PlayerWon)
-        {
-            session.RewardAmount = ParseConfiguredRewardAmount();
-        }
+        session.RewardAmount = ParseConfiguredRewardAmount();
 
         _context.GameSessions.Update(session);
         await _context.SaveChangesAsync();
@@ -133,10 +130,13 @@ public class GameService : IGameService
             .ToListAsync();
     }
 
-    public async Task<bool> ClaimRewardAsync(int sessionId)
+    public async Task<bool> ClaimRewardAsync(int sessionId, string playerAddress)
     {
         var session = await _context.GameSessions.FindAsync(sessionId);
-        if (session == null || session.RewardClaimed || !session.PlayerWon)
+        if (session == null
+            || session.RewardClaimed
+            || string.IsNullOrWhiteSpace(playerAddress)
+            || !string.Equals(session.PlayerAddress, playerAddress, StringComparison.OrdinalIgnoreCase))
             return false;
 
         var rewardClaim = await _blockchainService.RequestRewardClaimAsync(
