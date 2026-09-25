@@ -1,14 +1,72 @@
 // MetaMask Interoperability for Crypto Hockey
 window.metamaskInterop = {
+    getProvider: function () {
+        if (typeof window.ethereum === 'undefined') {
+            return null;
+        }
+
+        if (Array.isArray(window.ethereum.providers)) {
+            const metaMaskProvider = window.ethereum.providers.find(provider => provider && provider.isMetaMask);
+            return metaMaskProvider || null;
+        }
+
+        return window.ethereum.isMetaMask ? window.ethereum : null;
+    },
+
     // Check if MetaMask is installed
     isMetaMaskInstalled: function () {
-        return typeof window.ethereum !== 'undefined' && window.ethereum.isMetaMask;
+        return !!this.getProvider();
+    },
+
+    waitForProvider: async function (timeoutMs = 1200) {
+        const provider = this.getProvider();
+        if (provider) {
+            return provider;
+        }
+
+        const pollIntervalMs = 100;
+        const maxAttempts = Math.ceil(timeoutMs / pollIntervalMs);
+
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+            const polledProvider = this.getProvider();
+            if (polledProvider) {
+                return polledProvider;
+            }
+        }
+
+        return null;
+    },
+
+    isMobileDevice: function () {
+        const userAgent = navigator.userAgent || navigator.vendor || window.opera || '';
+        return /android|iphone|ipad|ipod/i.test(userAgent);
+    },
+
+    isInAppBrowser: function () {
+        const userAgent = navigator.userAgent || '';
+        return /(Twitter|FBAN|FBAV|Instagram|Line|wv)/i.test(userAgent);
+    },
+
+    getMetaMaskDeepLink: function () {
+        const currentUrl = window.location.href.replace(/^https?:\/\//i, '');
+        return `https://metamask.app.link/dapp/${encodeURI(currentUrl)}`;
+    },
+
+    openInMetaMask: function () {
+        if (!this.isMobileDevice()) {
+            return false;
+        }
+
+        window.location.href = this.getMetaMaskDeepLink();
+        return true;
     },
 
     // Connect to MetaMask wallet
     connectWallet: async function () {
         try {
-            if (!this.isMetaMaskInstalled()) {
+            const provider = await this.waitForProvider();
+            if (!provider) {
                 return {
                     isConnected: false,
                     address: null,
@@ -19,7 +77,7 @@ window.metamaskInterop = {
             }
 
             // Request account access
-            const accounts = await window.ethereum.request({
+            const accounts = await provider.request({
                 method: 'eth_requestAccounts'
             });
 
@@ -34,12 +92,12 @@ window.metamaskInterop = {
             }
 
             const address = accounts[0];
-            const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+            const chainId = await provider.request({ method: 'eth_chainId' });
             const chainIdNumber = parseInt(chainId, 16);
             const chainName = this.getChainName(chainIdNumber);
 
             // Get balance
-            const balance = await window.ethereum.request({
+            const balance = await provider.request({
                 method: 'eth_getBalance',
                 params: [address, 'latest']
             });
@@ -68,7 +126,8 @@ window.metamaskInterop = {
     // Get current wallet state
     getWalletState: async function () {
         try {
-            if (!this.isMetaMaskInstalled()) {
+            const provider = await this.waitForProvider();
+            if (!provider) {
                 return {
                     isConnected: false,
                     address: null,
@@ -78,7 +137,7 @@ window.metamaskInterop = {
                 };
             }
 
-            const accounts = await window.ethereum.request({
+            const accounts = await provider.request({
                 method: 'eth_accounts'
             });
 
@@ -93,11 +152,11 @@ window.metamaskInterop = {
             }
 
             const address = accounts[0];
-            const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+            const chainId = await provider.request({ method: 'eth_chainId' });
             const chainIdNumber = parseInt(chainId, 16);
             const chainName = this.getChainName(chainIdNumber);
 
-            const balance = await window.ethereum.request({
+            const balance = await provider.request({
                 method: 'eth_getBalance',
                 params: [address, 'latest']
             });
@@ -137,14 +196,15 @@ window.metamaskInterop = {
     // Switch to a different network
     switchNetwork: async function (chainId) {
         try {
-            if (!this.isMetaMaskInstalled()) {
+            const provider = await this.waitForProvider();
+            if (!provider) {
                 return false;
             }
 
             const hexChainId = '0x' + chainId.toString(16);
 
             try {
-                await window.ethereum.request({
+                await provider.request({
                     method: 'wallet_switchEthereumChain',
                     params: [{ chainId: hexChainId }],
                 });
@@ -154,7 +214,7 @@ window.metamaskInterop = {
                 if (switchError.code === 4902) {
                     const chainData = this.getChainData(chainId);
                     if (chainData) {
-                        await window.ethereum.request({
+                        await provider.request({
                             method: 'wallet_addEthereumChain',
                             params: [chainData],
                         });
@@ -208,7 +268,12 @@ window.metamaskInterop = {
                 throw new Error('MetaMask is not installed');
             }
 
-            const accounts = await window.ethereum.request({
+            const provider = this.getProvider();
+            if (!provider) {
+                throw new Error('MetaMask provider not found');
+            }
+
+            const accounts = await provider.request({
                 method: 'eth_accounts'
             });
 
@@ -216,7 +281,7 @@ window.metamaskInterop = {
                 throw new Error('No accounts found');
             }
 
-            const txHash = await window.ethereum.request({
+            const txHash = await provider.request({
                 method: 'eth_sendTransaction',
                 params: [{
                     from: accounts[0],
