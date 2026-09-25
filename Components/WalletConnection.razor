@@ -80,6 +80,8 @@
     private bool HasCheckedEnvironment = false;
     private bool autoConnectPending = false;
     private bool autoConnectAttempted = false;
+    private int autoConnectProviderChecks = 0;
+    private const int MaxAutoConnectProviderChecks = 4;
     private bool? lastAutoConnectValue = null;
 
     [Parameter]
@@ -100,6 +102,7 @@
         {
             autoConnectPending = false;
             autoConnectAttempted = false;
+            autoConnectProviderChecks = 0;
             lastAutoConnectValue = AutoConnect;
         }
 
@@ -122,18 +125,25 @@
         if (autoConnectPending && !autoConnectAttempted)
         {
             autoConnectPending = false;
-            try
+
+            if (!MetaMaskInstalled && !WalletState.IsConnected && autoConnectProviderChecks < MaxAutoConnectProviderChecks)
             {
+                autoConnectProviderChecks++;
+                await Task.Delay(500);
+                await RefreshWalletEnvironmentAsync();
+
                 if (!MetaMaskInstalled && !WalletState.IsConnected)
                 {
-                    await Task.Delay(500);
-                    await RefreshWalletEnvironmentAsync();
+                    autoConnectPending = autoConnectProviderChecks < MaxAutoConnectProviderChecks;
+                    autoConnectAttempted = autoConnectProviderChecks >= MaxAutoConnectProviderChecks;
+                    StateHasChanged();
+                    return;
                 }
+            }
 
-                if (MetaMaskInstalled || WalletState.IsConnected)
-                {
-                    await ConnectWalletInternalAsync(refreshEnvironment: false, allowDeepLinkFallback: false);
-                }
+            try
+            {
+                await ConnectWalletInternalAsync(refreshEnvironment: false, allowDeepLinkFallback: false);
             }
             finally
             {
