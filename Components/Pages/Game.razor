@@ -253,7 +253,16 @@
 
                         if (playerWon)
                         {
-                            await ClaimRewardAsync();
+                            try
+                            {
+                                await ClaimRewardAsync();
+                            }
+                            catch (Exception ex)
+                            {
+                                rewardStatusMessage = null;
+                                gameErrorMessage = "Reward payout failed. Please try again shortly.";
+                                Logger.LogError(ex, "Automatic reward payout failed for session {SessionId}", currentSessionId);
+                            }
                         }
                     }
 
