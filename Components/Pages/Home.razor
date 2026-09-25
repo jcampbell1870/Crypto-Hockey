@@ -41,10 +41,13 @@
         </div>
 
         <div class="mt-4 homepage-wallet-entry">
-            <button class="btn btn-primary btn-lg wallet-launch-btn" @onclick="OpenGameWithMetaMask">
+            <button class="btn btn-primary btn-lg wallet-launch-btn"
+                    @onclick="OpenGameWithMetaMask"
+                    aria-describedby="homepage-wallet-launch-help"
+                    aria-label="Connect MetaMask and open Crypto Hockey. On mobile this opens the game in the MetaMask app browser.">
                 Connect MetaMask &amp; Play
             </button>
-            <p class="wallet-launch-help">On mobile, this opens Crypto Hockey directly in the MetaMask app browser so you can connect, play, and claim rewards.</p>
+            <p class="wallet-launch-help" id="homepage-wallet-launch-help">On mobile, this opens Crypto Hockey directly in the MetaMask app browser so you can connect, play, and claim rewards.</p>
         </div>
     </div>
 </div>

@@ -116,9 +116,9 @@
         {
             autoConnectPending = false;
             autoConnectAttempts++;
-            await ConnectWalletInternalAsync(refreshEnvironment: true, allowDeepLinkFallback: false);
+            var connected = await ConnectWalletInternalAsync(refreshEnvironment: true, allowDeepLinkFallback: false);
 
-            if (!WalletState.IsConnected && autoConnectAttempts < MaxAutoConnectAttempts)
+            if (!connected && autoConnectAttempts < MaxAutoConnectAttempts)
             {
                 autoConnectPending = true;
             }
@@ -137,7 +137,7 @@
         await ConnectWalletInternalAsync();
     }
 
-    private async Task ConnectWalletInternalAsync(bool refreshEnvironment = true, bool allowDeepLinkFallback = true)
+    private async Task<bool> ConnectWalletInternalAsync(bool refreshEnvironment = true, bool allowDeepLinkFallback = true)
     {
         if (refreshEnvironment)
         {
@@ -147,12 +147,13 @@
         if (allowDeepLinkFallback && IsMobileDevice && (!MetaMaskInstalled || IsInAppBrowser))
         {
             await OpenInMetaMaskApp();
-            return;
+            return false;
         }
 
         WalletState = await WalletService.ConnectWalletAsync();
         await PublishWalletStateAsync();
         StateHasChanged();
+        return WalletState.IsConnected;
     }
 
     private async Task OpenInMetaMaskApp()
