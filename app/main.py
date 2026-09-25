@@ -4,6 +4,7 @@ from datetime import datetime
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
+from threading import RLock
 from uuid import uuid4
 
 import httpx
@@ -40,6 +41,8 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "wwwroot")), name="static")
 Base.metadata.create_all(bind=engine)
 challenge_store: dict[str, dict] = {}
+challenge_store_lock = RLock()
+ALLOWED_CHALLENGE_ACTIONS = {"complete_session", "claim_reward"}
 
 
 @app.on_event("startup")
@@ -106,7 +109,9 @@ def _get_or_create_player(db: Session, wallet_address: str) -> PlayerProfile:
 
 async def _request_reward_claim(wallet_address: str, proof: RewardGameProof) -> tuple[bool, str | None, str | None]:
     if not settings.reward_issuer_url:
-        return True, None, None
+        if settings.environment.lower() != "production":
+            return True, None, None
+        return False, "Reward issuer URL is not configured.", None
 
     payload = {
         "recipient": wallet_address,
@@ -130,16 +135,20 @@ async def _request_reward_claim(wallet_address: str, proof: RewardGameProof) -> 
     if response.status_code >= 400:
         return False, response.text or f"Issuer error {response.status_code}.", None
 
-    response_payload = response.json() if response.content else {}
+    try:
+        response_payload = response.json() if response.content else {}
+    except ValueError:
+        return False, "Reward issuer returned invalid JSON.", None
     nonce = response_payload.get("nonce")
     return True, None, nonce
 
 
 def _cleanup_challenges() -> None:
-    now = datetime.utcnow()
-    expired = [challenge_id for challenge_id, challenge in challenge_store.items() if challenge["expires_at"] <= now]
-    for challenge_id in expired:
-        challenge_store.pop(challenge_id, None)
+    with challenge_store_lock:
+        now = datetime.utcnow()
+        expired = [challenge_id for challenge_id, challenge in challenge_store.items() if challenge["expires_at"] <= now]
+        for challenge_id in expired:
+            challenge_store.pop(challenge_id, None)
 
 
 def _issue_challenge(
@@ -150,6 +159,8 @@ def _issue_challenge(
     opponent_score: int | None = None,
 ) -> dict:
     _cleanup_challenges()
+    if action not in ALLOWED_CHALLENGE_ACTIONS:
+        raise HTTPException(status_code=400, detail="Unsupported challenge action.")
     challenge_id = uuid4().hex
     nonce = uuid4().hex
     issued_at = datetime.utcnow()
@@ -165,20 +176,21 @@ def _issue_challenge(
     lines.append(f"Nonce: {nonce}")
     lines.append(f"IssuedAt: {issued_at.isoformat()}Z")
     message = "\n".join(lines)
-    challenge_store[challenge_id] = {
-        "wallet_address": wallet_address,
-        "action": action,
-        "session_id": session_id,
-        "player_score": player_score,
-        "opponent_score": opponent_score,
-        "message": message,
-        "expires_at": issued_at + timedelta(minutes=5),
-        "used": False,
-    }
+    with challenge_store_lock:
+        challenge_store[challenge_id] = {
+            "wallet_address": wallet_address,
+            "action": action,
+            "session_id": session_id,
+            "player_score": player_score,
+            "opponent_score": opponent_score,
+            "message": message,
+            "expires_at": issued_at + timedelta(minutes=5),
+            "used": False,
+        }
     return {
         "challenge_id": challenge_id,
         "message": message,
-        "expires_at": challenge_store[challenge_id]["expires_at"].isoformat() + "Z",
+        "expires_at": (issued_at + timedelta(minutes=5)).isoformat() + "Z",
     }
 
 
@@ -193,24 +205,25 @@ def _verify_challenge(
     opponent_score: int | None = None,
 ) -> None:
     _cleanup_challenges()
-    challenge = challenge_store.get(challenge_id)
-    if challenge is None or challenge["used"]:
-        raise HTTPException(status_code=400, detail="Challenge is invalid or already used.")
-    if challenge["wallet_address"].lower() != wallet_address.lower():
-        raise HTTPException(status_code=403, detail="Challenge wallet does not match the session owner.")
-    if challenge["action"] != action or challenge["session_id"] != session_id:
-        raise HTTPException(status_code=400, detail="Challenge does not match this request.")
-    if challenge["player_score"] != player_score or challenge["opponent_score"] != opponent_score:
-        raise HTTPException(status_code=400, detail="Challenge does not match the submitted score.")
+    with challenge_store_lock:
+        challenge = challenge_store.get(challenge_id)
+        if challenge is None or challenge["used"]:
+            raise HTTPException(status_code=400, detail="Challenge is invalid or already used.")
+        if challenge["wallet_address"].lower() != wallet_address.lower():
+            raise HTTPException(status_code=403, detail="Challenge wallet does not match the session owner.")
+        if challenge["action"] != action or challenge["session_id"] != session_id:
+            raise HTTPException(status_code=400, detail="Challenge does not match this request.")
+        if challenge["player_score"] != player_score or challenge["opponent_score"] != opponent_score:
+            raise HTTPException(status_code=400, detail="Challenge does not match the submitted score.")
 
-    recovered_wallet = Account.recover_message(
-        encode_defunct(text=challenge["message"]),
-        signature=signature,
-    )
-    if recovered_wallet.lower() != wallet_address.lower():
-        raise HTTPException(status_code=403, detail="Signature does not match the session owner.")
+        recovered_wallet = Account.recover_message(
+            encode_defunct(text=challenge["message"]),
+            signature=signature,
+        )
+        if recovered_wallet.lower() != wallet_address.lower():
+            raise HTTPException(status_code=403, detail="Signature does not match the session owner.")
 
-    challenge["used"] = True
+        challenge["used"] = True
 
 
 @app.get("/", response_class=HTMLResponse)

@@ -466,6 +466,9 @@
         }
 
         function startLoop() {
+            if (running) {
+                return;
+            }
             running = true;
             lastFrame = performance.now();
             gameOverModal.classList.add("hidden");
