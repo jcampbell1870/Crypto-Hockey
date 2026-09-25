@@ -14,6 +14,15 @@
         return `${address.slice(0, 6)}...${address.slice(-4)}`;
     }
 
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
     function showMessage(element, message, isError = false) {
         if (!element) return;
         if (!message) {
@@ -358,7 +367,6 @@
 
         async function submitFinalState() {
             if (finalStateSubmitted || !activeSessionId) return;
-            finalStateSubmitted = true;
             await apiFetch(`/api/game-sessions/${activeSessionId}/complete`, {
                 method: "POST",
                 body: JSON.stringify({
@@ -366,6 +374,7 @@
                     opponent_score: engine.state.opponentScore
                 })
             });
+            finalStateSubmitted = true;
             if (walletState.address) {
                 const profile = await apiFetch(`/api/players/${encodeURIComponent(walletState.address)}`);
                 stats.innerHTML = `
@@ -554,18 +563,18 @@
                 : lobby.heads_up_matches.map((match) => `
                     <div class="arena-card">
                         <div>
-                            <strong>${match.host_name}</strong>
-                            <span>vs ${match.challenger_name || "Waiting..."}</span>
+                            <strong>${escapeHtml(match.host_name)}</strong>
+                            <span>vs ${escapeHtml(match.challenger_name || "Waiting...")}</span>
                         </div>
                         <div class="chip-row">
-                            <span class="chip">${match.status}</span>
-                            ${match.winner_name ? `<span class="chip">Winner: ${match.winner_name}</span>` : ""}
+                            <span class="chip">${escapeHtml(match.status)}</span>
+                            ${match.winner_name ? `<span class="chip">Winner: ${escapeHtml(match.winner_name)}</span>` : ""}
                         </div>
                         <div class="action-row">
-                            ${canJoinHeadsUp(match) ? `<button class="btn btn-sm btn-primary" data-action="join-heads-up" data-match-id="${match.id}">Join</button>` : ""}
+                            ${canJoinHeadsUp(match) ? `<button class="btn btn-sm btn-primary" data-action="join-heads-up" data-match-id="${escapeHtml(match.id)}">Join</button>` : ""}
                             ${canReportHeadsUp(match) ? `
-                                <button class="btn btn-sm btn-outline-success" data-action="report-heads-up" data-match-id="${match.id}" data-winner="${walletState.address}">Report Me Winner</button>
-                                <button class="btn btn-sm btn-outline-warning" data-action="report-heads-up" data-match-id="${match.id}" data-winner="${opponentWallet(match) || ""}">Report Opponent Winner</button>
+                                <button class="btn btn-sm btn-outline-success" data-action="report-heads-up" data-match-id="${escapeHtml(match.id)}" data-winner="${escapeHtml(walletState.address || "")}">Report Me Winner</button>
+                                <button class="btn btn-sm btn-outline-warning" data-action="report-heads-up" data-match-id="${escapeHtml(match.id)}" data-winner="${escapeHtml(opponentWallet(match) || "")}">Report Opponent Winner</button>
                             ` : ""}
                         </div>
                     </div>
@@ -576,18 +585,18 @@
                 : lobby.tournaments.map((tournament) => `
                     <div class="arena-card">
                         <div>
-                            <strong>${tournament.name}</strong>
+                            <strong>${escapeHtml(tournament.name)}</strong>
                             <span class="chip">${tournament.entrants.length}/${tournament.seat_limit} players</span>
-                            <span class="chip">${tournament.status}</span>
-                            ${tournament.champion_name ? `<span class="chip">Champion: ${tournament.champion_name}</span>` : ""}
+                            <span class="chip">${escapeHtml(tournament.status)}</span>
+                            ${tournament.champion_name ? `<span class="chip">Champion: ${escapeHtml(tournament.champion_name)}</span>` : ""}
                         </div>
                         <div class="action-row">
-                            ${canJoinTournament(tournament) ? `<button class="btn btn-sm btn-primary" data-action="join-tournament" data-tournament-id="${tournament.id}">Join</button>` : ""}
-                            <button class="btn btn-sm btn-outline-primary" data-action="toggle-tournament" data-tournament-id="${tournament.id}">
-                                ${selectedTournamentId === tournament.id ? "Hide Bracket" : "View Bracket"}
+                            ${canJoinTournament(tournament) ? `<button class="btn btn-sm btn-primary" data-action="join-tournament" data-tournament-id="${escapeHtml(tournament.id)}">Join</button>` : ""}
+                            <button class="btn btn-sm btn-outline-primary" data-action="toggle-tournament" data-tournament-id="${escapeHtml(tournament.id)}">
+                                ${selectedTournamentId === String(tournament.id) ? "Hide Bracket" : "View Bracket"}
                             </button>
                         </div>
-                        ${selectedTournamentId === tournament.id ? `
+                        ${selectedTournamentId === String(tournament.id) ? `
                             <div class="bracket-view">
                                 ${tournament.rounds.length === 0
                                     ? '<p class="text-muted">Bracket starts once all 8 seats are filled.</p>'
@@ -596,14 +605,14 @@
                                             <h5>Round ${round[0].round_number}</h5>
                                             ${round.map((match) => `
                                                 <div class="bracket-match">
-                                                    <span>${match.player_one_name || "TBD"} vs ${match.player_two_name || "TBD"}</span>
+                                                    <span>${escapeHtml(match.player_one_name || "TBD")} vs ${escapeHtml(match.player_two_name || "TBD")}</span>
                                                     ${match.is_complete
-                                                        ? `<span class="chip">Winner: ${match.winner_name}</span>`
+                                                        ? `<span class="chip">Winner: ${escapeHtml(match.winner_name)}</span>`
                                                         : canReportTournamentMatch(tournament, match)
                                                             ? `
                                                                 <div class="action-row mt-2">
-                                                                    <button class="btn btn-sm btn-outline-success" data-action="report-tournament" data-tournament-id="${tournament.id}" data-match-id="${match.id}" data-winner="${walletState.address}">Report Me Winner</button>
-                                                                    <button class="btn btn-sm btn-outline-warning" data-action="report-tournament" data-tournament-id="${tournament.id}" data-match-id="${match.id}" data-winner="${tournamentOpponentWallet(match) || ""}">Report Opponent Winner</button>
+                                                                    <button class="btn btn-sm btn-outline-success" data-action="report-tournament" data-tournament-id="${escapeHtml(tournament.id)}" data-match-id="${escapeHtml(match.id)}" data-winner="${escapeHtml(walletState.address || "")}">Report Me Winner</button>
+                                                                    <button class="btn btn-sm btn-outline-warning" data-action="report-tournament" data-tournament-id="${escapeHtml(tournament.id)}" data-match-id="${escapeHtml(match.id)}" data-winner="${escapeHtml(tournamentOpponentWallet(match) || "")}">Report Opponent Winner</button>
                                                                 </div>
                                                             `
                                                             : ""
@@ -674,7 +683,7 @@
                     display_name: currentDisplayName()
                 })
             });
-            selectedTournamentId = tournament.id;
+            selectedTournamentId = String(tournament.id);
             showMessage(message, `Tournament ${tournament.name} created.`);
         }));
 
@@ -711,10 +720,10 @@
                             display_name: currentDisplayName()
                         })
                     });
-                    selectedTournamentId = tournament.id;
+                    selectedTournamentId = String(tournament.id);
                     showMessage(message, tournament.status === "InProgress" ? "Tournament is full and the bracket is live." : "Tournament seat locked.");
                 } else if (action === "toggle-tournament") {
-                    selectedTournamentId = selectedTournamentId === target.dataset.tournamentId ? null : target.dataset.tournamentId;
+                    selectedTournamentId = selectedTournamentId === String(target.dataset.tournamentId) ? null : String(target.dataset.tournamentId);
                 } else if (action === "report-tournament") {
                     const tournament = await apiFetch(`/api/online/tournaments/${target.dataset.tournamentId}/matches/${target.dataset.matchId}/report`, {
                         method: "POST",
@@ -723,7 +732,7 @@
                             reporter_wallet_address: walletState.address
                         })
                     });
-                    selectedTournamentId = tournament.id;
+                    selectedTournamentId = String(tournament.id);
                     showMessage(message, tournament.status === "Completed" ? `Tournament complete. Champion: ${tournament.champion_name}.` : "Tournament match result submitted.");
                 }
                 await refresh();

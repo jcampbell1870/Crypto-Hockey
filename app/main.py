@@ -218,6 +218,8 @@ def complete_game_session(session_id: int, payload: CompleteGameSessionRequest, 
     session = db.get(GameSession, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Game session not found.")
+    if session.ended_at is not None:
+        return _session_to_dict(session)
 
     session.ended_at = datetime.utcnow()
     session.player_score = payload.player_score

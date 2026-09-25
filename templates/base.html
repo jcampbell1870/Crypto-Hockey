@@ -15,10 +15,10 @@
         <div class="site-header__inner">
             <a class="site-brand" href="/">🏒 Crypto Hockey</a>
             <nav class="site-nav">
-                <a href="/" class="{% if page_name == 'home' %}active{% endif %}">Home</a>
-                <a href="/game" class="{% if page_name == 'game' %}active{% endif %}">Game</a>
-                <a href="/leaderboard" class="{% if page_name == 'leaderboard' %}active{% endif %}">Leaderboard</a>
-                <a href="/online" class="{% if page_name == 'online' %}active{% endif %}">Online Arena</a>
+                <a href="/" class="{% if page_name == 'home' %}active{% endif %}" {% if page_name == 'home' %}aria-current="page"{% endif %}>Home</a>
+                <a href="/game" class="{% if page_name == 'game' %}active{% endif %}" {% if page_name == 'game' %}aria-current="page"{% endif %}>Game</a>
+                <a href="/leaderboard" class="{% if page_name == 'leaderboard' %}active{% endif %}" {% if page_name == 'leaderboard' %}aria-current="page"{% endif %}>Leaderboard</a>
+                <a href="/online" class="{% if page_name == 'online' %}active{% endif %}" {% if page_name == 'online' %}aria-current="page"{% endif %}>Online Arena</a>
             </nav>
         </div>
     </header>

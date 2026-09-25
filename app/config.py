@@ -42,10 +42,7 @@ class Settings:
         "REWARD_VAULT_ADDRESS",
         "0x1e4f6e4a382adbdb662733a19ae773d3ab8f497d",
     )
-    reward_issuer_url: str = os.getenv(
-        "REWARD_ISSUER_URL",
-        "https://crypto-chess.onrender.com/api/reward-claim",
-    )
+    reward_issuer_url: str = os.getenv("REWARD_ISSUER_URL", "")
     reward_amount: float = float(os.getenv("REWARD_AMOUNT", "10"))
     default_network_chain_id: int = int(os.getenv("DEFAULT_NETWORK_CHAIN_ID", "1"))
     supported_chain_ids: list[int] = field(
