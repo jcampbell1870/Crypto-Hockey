@@ -1,6 +1,8 @@
 services:
   - type: web
     name: crypto-hockey
-    runtime: dotnet
-    buildCommand: dotnet publish "Crypto Hockey.csproj" -c Release -o out
-    startCommand: dotnet out/Crypto_Hockey.dll
+    runtime: docker
+    dockerFilePath: ./Dockerfile
+    envVars:
+      - key: TRUST_PROXY_HEADERS_FROM_RENDER
+        value: "true"

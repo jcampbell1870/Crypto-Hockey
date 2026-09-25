@@ -29,6 +29,8 @@ builder.Services.AddSingleton<IOnlineCompetitionService, OnlineCompetitionServic
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
+var trustProxyTerminatedTls = builder.Configuration.GetValue<bool>("TRUST_PROXY_HEADERS_FROM_RENDER");
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
@@ -36,7 +38,11 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
+
+if (!trustProxyTerminatedTls)
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAntiforgery();
 
