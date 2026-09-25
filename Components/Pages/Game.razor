@@ -38,11 +38,17 @@
                     @gameErrorMessage
                 </div>
             }
+            @if (!string.IsNullOrWhiteSpace(rewardStatusMessage))
+            {
+               <div class="alert @(rewardClaimed ? "alert-success" : "alert-info")" role="status" aria-live="polite">
+                   @rewardStatusMessage
+               </div>
+            }
             <div class="form-group">
-                <label for="difficulty">Difficulty:</label>
-                <select id="difficulty" class="form-control" @bind="selectedDifficulty">
-                    <option value="Easy">Easy</option>
-                    <option value="Medium" selected>Medium</option>
+               <label for="difficulty">Difficulty:</label>
+               <select id="difficulty" class="form-control" @bind="selectedDifficulty">
+                   <option value="Easy">Easy</option>
+                   <option value="Medium" selected>Medium</option>
                     <option value="Hard">Hard</option>
                 </select>
             </div>
@@ -65,10 +71,10 @@
                 <button class="btn btn-primary btn-block" @onclick="ResetGame">
                     Play Again
                 </button>
-                @if (playerWon)
+               @if (playerWon && !rewardClaimed && !rewardClaimInProgress)
                 {
-                    <button class="btn btn-info btn-block mt-2" @onclick="ClaimReward" disabled="@rewardClaimed">
-                        @(rewardClaimed ? "Reward Claimed" : "Claim Reward")
+                   <button class="btn btn-info btn-block mt-2" @onclick="RetryRewardClaim">
+                       Retry Reward Payout
                     </button>
                 }
             }
@@ -98,20 +104,6 @@
                 @ontouchmove="OnTouchMove">
         </canvas>
 
-        @if (gameOver)
-        {
-            <div class="game-over-modal">
-                <div class="game-over-content">
-                    <h2>@(playerWon ? "🎉 YOU WON! 🎉" : "Game Over")</h2>
-                    @if (playerWon)
-                    {
-                        <p class="reward-message">You earned 10 A1870 tokens!</p>
-                    }
-                    <p>Final Score: @playerScore - @opponentScore</p>
-                    <p class="difficulty-badge">Difficulty: @selectedDifficulty</p>
-                </div>
-            </div>
-        }
     </div>
 </div>
 
@@ -126,11 +118,13 @@
     private bool gameOver = false;
     private bool playerWon = false;
     private bool rewardClaimed = false;
+    private bool rewardClaimInProgress = false;
     private int playerScore = 0;
     private int opponentScore = 0;
     private string selectedDifficulty = "Medium";
     private int? currentSessionId;
     private string? gameErrorMessage;
+    private string? rewardStatusMessage;
 
     private CancellationTokenSource? gameLoopCts;
     private DateTime lastFrameTime = DateTime.UtcNow;
@@ -205,8 +199,10 @@
             gameOver = false;
             playerWon = false;
             rewardClaimed = false;
+            rewardClaimInProgress = false;
             playerScore = 0;
             opponentScore = 0;
+            rewardStatusMessage = null;
             lastFrameTime = DateTime.UtcNow;
 
             gameLoopCts = new CancellationTokenSource();
@@ -254,9 +250,14 @@
                     if (currentSessionId.HasValue)
                     {
                         await GameService.EndGameSessionAsync(currentSessionId.Value, playerScore, opponentScore);
+
+                        if (playerWon)
+                        {
+                            await ClaimRewardAsync();
+                        }
                     }
 
-                    StateHasChanged();
+                    await InvokeAsync(StateHasChanged);
                     break;
                 }
 
@@ -311,41 +312,60 @@
         gameOver = false;
         playerWon = false;
         rewardClaimed = false;
+        rewardClaimInProgress = false;
         playerScore = 0;
         opponentScore = 0;
         currentSessionId = null;
         gameErrorMessage = null;
+        rewardStatusMessage = null;
     }
 
-    private async Task ClaimReward()
+    private Task RetryRewardClaim()
     {
-        if (currentSessionId.HasValue)
-        {
-            try
-            {
-                gameErrorMessage = null;
-                bool success = await GameService.ClaimRewardAsync(currentSessionId.Value);
-                if (success)
-                {
-                    rewardClaimed = true;
-                    // Refresh player profile
-                    if (currentWalletState.IsConnected)
-                    {
-                        playerProfile = await GameService.GetOrCreatePlayerAsync(currentWalletState.Address!);
-                    }
-                }
-                else
-                {
-                    gameErrorMessage = "Reward claim could not be completed right now.";
-                }
-            }
-            catch (Exception ex)
-            {
-                gameErrorMessage = "Reward claim failed. Please try again shortly.";
-                Logger.LogError(ex, "Error claiming reward for session {SessionId}", currentSessionId);
-            }
+        return ClaimRewardAsync();
+    }
 
-            StateHasChanged();
+    private async Task ClaimRewardAsync()
+    {
+        if (!currentSessionId.HasValue || rewardClaimed || rewardClaimInProgress)
+        {
+            return;
+        }
+
+        try
+        {
+            rewardClaimInProgress = true;
+            gameErrorMessage = null;
+            rewardStatusMessage = "Starting your reward payout...";
+            await InvokeAsync(StateHasChanged);
+
+            bool success = await GameService.ClaimRewardAsync(currentSessionId.Value);
+            if (success)
+            {
+                rewardClaimed = true;
+                rewardStatusMessage = "Reward payout started. Check your wallet shortly.";
+
+                if (currentWalletState.IsConnected)
+                {
+                    playerProfile = await GameService.GetOrCreatePlayerAsync(currentWalletState.Address!);
+                }
+            }
+            else
+            {
+                rewardStatusMessage = null;
+                gameErrorMessage = "Reward payout could not be completed right now. You can retry below.";
+            }
+        }
+        catch (Exception ex)
+        {
+            rewardStatusMessage = null;
+            gameErrorMessage = "Reward payout failed. Please try again shortly.";
+            Logger.LogError(ex, "Error claiming reward for session {SessionId}", currentSessionId);
+        }
+        finally
+        {
+            rewardClaimInProgress = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 

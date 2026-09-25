@@ -79,7 +79,6 @@ public class GameService : IGameService
         if (session.PlayerWon)
         {
             player.TotalWins++;
-            player.TotalRewardsEarned += session.RewardAmount;
         }
         else
         {
@@ -155,12 +154,42 @@ public class GameService : IGameService
 
         if (rewardClaim.IsSuccessful)
         {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            await _context.Entry(session).ReloadAsync();
+
+            if (session.RewardClaimed)
+            {
+                await transaction.CommitAsync();
+                return true;
+            }
+
             session.RewardClaimed = true;
             session.TransactionHash = !string.IsNullOrWhiteSpace(rewardClaim.Payload?.Nonce)
                 ? $"issuer-claim:{rewardClaim.Payload.Nonce}"
                 : session.TransactionHash;
+            var player = await _context.PlayerProfiles
+                .FirstOrDefaultAsync(p => p.WalletAddress == session.PlayerAddress);
+
+            if (player == null)
+            {
+                player = new PlayerProfile
+                {
+                    WalletAddress = session.PlayerAddress,
+                    CreatedAt = DateTime.UtcNow,
+                    LastPlayedAt = session.EndedAt,
+                    TotalGames = 0,
+                    TotalWins = 0,
+                    TotalLosses = 0,
+                    TotalRewardsEarned = 0
+                };
+
+                _context.PlayerProfiles.Add(player);
+            }
+
+            player.TotalRewardsEarned += session.RewardAmount;
             _context.GameSessions.Update(session);
             await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
             _logger.LogInformation("Reward claim package issued for session {SessionId}", sessionId);
         }
         else
