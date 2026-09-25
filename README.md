@@ -203,10 +203,15 @@ For production, use environment variables instead of appsettings.json:
 
 ```bash
 ASPNETCORE_ENVIRONMENT=Production
+AllowedHosts=cryptohockey.org;www.cryptohockey.org
 BlockchainConfig__Arcade1870ContractAddress=0x8eddD4edea39c5B5f77662453600F53A202EE47C
+BlockchainConfig__RewardVaultAddress=0x1e4f6e4a382adbdb662733a19ae773d3ab8f497d
+BlockchainConfig__RewardIssuerUrl=https://crypto-chess.onrender.com/api/reward-claim
 BlockchainConfig__EthereumRpcUrl=https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
 ConnectionStrings__DefaultConnection=your_connection_string
 ```
+
+Production defaults for the Cloudflare + Render deployment live in `appsettings.Production.json`, with `AllowedHosts` restricted to `cryptohockey.org` and `www.cryptohockey.org`.
 
 ## 🧪 Testing
 

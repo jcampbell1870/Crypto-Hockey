@@ -199,7 +199,7 @@ az webapp deployment source config-zip \
 	  "Microsoft.AspNetCore": "Error"
 	}
   },
-  "AllowedHosts": "crypto-hockey.com,www.crypto-hockey.com",
+  "AllowedHosts": "cryptohockey.org;www.cryptohockey.org",
   "BlockchainConfig": {
 	"Arcade1870ContractAddress": "0x8eddD4edea39c5B5f77662453600F53A202EE47C",
 	"RewardAmount": "10",
@@ -321,15 +321,15 @@ spec:
 ### Smoke Tests
 ```powershell
 # Test home page
-$response = Invoke-WebRequest -Uri "https://crypto-hockey.com" -UseBasicParsing
+$response = Invoke-WebRequest -Uri "https://www.cryptohockey.org" -UseBasicParsing
 $response.StatusCode # Should be 200
 
 # Test game page
-$response = Invoke-WebRequest -Uri "https://crypto-hockey.com/game" -UseBasicParsing
+$response = Invoke-WebRequest -Uri "https://www.cryptohockey.org/game" -UseBasicParsing
 $response.StatusCode # Should be 200
 
 # Test API health
-$response = Invoke-WebRequest -Uri "https://crypto-hockey.com/api/health" -UseBasicParsing
+$response = Invoke-WebRequest -Uri "https://www.cryptohockey.org" -UseBasicParsing
 $response.StatusCode # Should be 200
 ```
 
