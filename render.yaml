@@ -4,5 +4,9 @@ services:
     runtime: docker
     dockerFilePath: ./Dockerfile
     envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: AllowedHosts
+        value: cryptohockey.org;www.cryptohockey.org
       - key: TRUST_PROXY_HEADERS_FROM_RENDER
         value: "true"
