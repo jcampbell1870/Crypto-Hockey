@@ -59,7 +59,7 @@ window.metamaskInterop = {
 
     getMetaMaskDeepLinkForUrl: function (targetUrl) {
         const normalizedUrl = targetUrl.replace(/^https?:\/\//i, '');
-        return `https://link.metamask.io/dapp/${encodeURIComponent(normalizedUrl)}`;
+        return `https://link.metamask.io/dapp/${encodeURI(normalizedUrl)}`;
     },
 
     openInMetaMask: function () {
