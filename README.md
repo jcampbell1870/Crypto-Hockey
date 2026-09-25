@@ -1,326 +1,93 @@
-# 🏒 Crypto Hockey - Web-Based Air Hockey Game with Blockchain Rewards
+# 🏒 Crypto Hockey
 
-A modern, interactive web-based air hockey game built with Blazor, featuring MetaMask wallet integration and ERC-20 token rewards using the Arcade1870 token.
+Crypto Hockey is a Python 3 / FastAPI web game that keeps the original air-hockey gameplay, MetaMask wallet flow, reward-claim integration, leaderboard tracking, and online arena experience.
 
-## 🎮 Features
+## Current Stack
 
-- **Classic Air Hockey Gameplay**: Physics-based puck movement with paddle collision detection
-- **AI Opponent**: Three difficulty levels (Easy, Medium, Hard) with adaptive AI
-- **MetaMask Integration**: Connect your Web3 wallet securely
-- **Crypto-Chess Aligned Payouts**: Uses shared Arcade1870 reward vault + issuer claim flow
-- **Player Statistics**: Track your wins, losses, and earned rewards
-- **Global Leaderboard**: Compete against other players worldwide
-- **Online Arena**: GG Poker-style heads-up tables and 8-player tournaments
-- **Responsive Design**: Play on desktop and mobile devices
-- **Dark-Themed UI**: Modern, crypto-friendly interface
+- Python 3.11
+- FastAPI
+- SQLAlchemy
+- Jinja templates
+- Browser-side JavaScript canvas game loop
+- MetaMask browser integration
 
-## 📋 Prerequisites
+## Features
 
-- .NET 10 SDK
-- Visual Studio 2026 Community or later (or VS Code with C# extensions)
-- MetaMask browser extension (for wallet connection)
-- SQL Server LocalDB (for local development)
+- Single-player air hockey vs AI with Easy / Medium / Hard difficulty
+- MetaMask wallet connect, network switch, and copy-address support
+- Persistent player profiles and leaderboard stats
+- Reward-claim requests against the configured issuer URL
+- Online heads-up tables and 8-player tournament lobby
+- Render deployment via Python web service
 
-## 🚀 Getting Started
+## Local Development
 
-### 1. Clone and Setup
+### Prerequisites
 
-```bash
-cd "C:\Users\thund\source\repos\Crypto Hockey\"
-dotnet restore
-```
+- Python 3.11+
+- pip
+- MetaMask browser extension
 
-### 2. Database Configuration
-
-Update the connection string in `appsettings.json`:
-
-```json
-"ConnectionStrings": {
-	"DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=CryptoHockeyDb;Trusted_Connection=true;"
-}
-```
-
-Create the database:
+### Install
 
 ```bash
-dotnet ef database update
+cd /home/runner/work/Crypto-Hockey/Crypto-Hockey
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-### 3. Blockchain Configuration
-
-Update `appsettings.json` with your RPC endpoints:
-
-```json
-"BlockchainConfig": {
-	"Arcade1870ContractAddress": "0x8eddD4edea39c5B5f77662453600F53A202EE47C",
-	"RewardAmount": "10",
-	"EthereumRpcUrl": "https://eth-mainnet.g.alchemy.com/v2/YOUR_ALCHEMY_KEY",
-	"SepoliaRpcUrl": "https://eth-sepolia.g.alchemy.com/v2/YOUR_ALCHEMY_KEY",
-	"PolygonRpcUrl": "https://polygon-rpc.com",
-	"DefaultNetworkChainId": 1,
-	"SupportedChainIds": [1, 11155111, 137]
-}
-```
-
-> **Note**: Get free RPC keys from [Alchemy](https://www.alchemy.com/) or [Infura](https://www.infura.io/)
-
-### 4. Run the Application
+### Run
 
 ```bash
-dotnet run
+uvicorn app.main:app --reload
 ```
 
-Navigate to `https://localhost:5001` in your browser.
+Open:
 
-## 🎯 How to Play
+- http://127.0.0.1:8000/
+- http://127.0.0.1:8000/game
+- http://127.0.0.1:8000/leaderboard
+- http://127.0.0.1:8000/online
 
-1. **Connect Wallet**: Click "Connect MetaMask" to link your Web3 wallet
-2. **Choose Difficulty**: Select Easy, Medium, or Hard AI opponent
-3. **Play**: Use your mouse to control your paddle (left side)
-4. **Win & Earn**: First to 5 points wins! Winners earn 10 A1870 tokens
-5. **Claim Rewards**: Claim through the same issuer/vault payout flow used by Crypto Chess
+## Configuration
 
-## 🏗️ Project Structure
-
-```
-Crypto Hockey/
-├── Components/
-│   ├── Pages/
-│   │   ├── Home.razor           # Landing page
-│   │   ├── Game.razor           # Main game component
-│   │   └── Leaderboard.razor    # Leaderboard page
-│   ├── WalletConnection.razor   # Wallet UI component
-│   ├── Layout/                  # Layout components
-│   └── App.razor                # Root component
-├── Services/
-│   ├── WalletService.cs         # MetaMask integration
-│   ├── BlockchainService.cs     # Smart contract interaction
-│   ├── GameService.cs           # Game logic & database
-│   └── GameEngine.cs            # Game physics & AI
-├── Models/
-│   ├── BlockchainConfig.cs
-│   ├── GameSession.cs
-│   ├── PlayerProfile.cs
-│   └── WalletConnectionState.cs
-├── Data/
-│   └── GameDbContext.cs         # Entity Framework context
-├── wwwroot/
-│   ├── js/
-│   │   ├── metamask-interop.js  # MetaMask JS interop
-│   │   └── game-renderer.js     # Canvas rendering
-│   ├── css/
-│   │   └── game-styles.css      # Game styling
-│   └── app.css                  # Global styles
-├── Program.cs                   # Startup configuration
-└── appsettings.json            # Configuration file
-```
-
-## 🔐 Smart Contract Details
-
-**Arcade1870 Token**
-- Contract Address: `0x8eddD4edea39c5B5f77662453600F53A202EE47C`
-- Network: Ethereum Mainnet (configurable for testnet)
-- Standard: ERC-20
-- Reward Per Win: 10 A1870 tokens
-
-[View on Etherscan](https://etherscan.io/token/0x8eddD4edea39c5B5f77662453600F53A202EE47C)
-
-## 🎮 Game Mechanics
-
-### Physics
-- Realistic puck movement with velocity tracking
-- Paddle-puck collision detection with angle reflection
-- Progressive speed increase on paddle hits (max 500 units/sec)
-- Boundary collision and bounce
-
-### AI Difficulty Levels
-- **Easy**: 60% paddle speed, 0.5s reaction delay
-- **Medium**: 85% paddle speed, 0.2s reaction delay
-- **Hard**: 100% paddle speed, 0.05s reaction delay
-
-### Scoring
-- First to 5 points wins
-- Automatic game-over detection
-- Session recorded in database
-- Manual reward claiming available
-
-## 📊 Database Schema
-
-### PlayerProfile
-- WalletAddress (unique)
-- TotalGames, TotalWins, TotalLosses
-- TotalRewardsEarned
-- Win Rate (calculated)
-
-### GameSession
-- PlayerAddress
-- PlayerScore, OpponentScore
-- DifficultyLevel
-- RewardAmount (10 tokens per win)
-- TransactionHash, RewardClaimed status
-- Timestamps
-
-## 🌐 Supported Networks
-
-1. **Ethereum Mainnet** (Chain ID: 1)
-2. **Sepolia Testnet** (Chain ID: 11155111)
-3. **Polygon Mainnet** (Chain ID: 137)
-
-Switch networks in-game using the "Switch Network" button in wallet panel.
-
-## 🚢 Deployment
-
-### Render Deployment
-
-This repository is an ASP.NET Core app, so Render must deploy it as a **.NET web service**, not a Node service.
-
-1. Create the service from this repository using the root `render.yaml`, or set the service environment to `.NET`.
-2. Use the provided build command:
+Environment variables:
 
 ```bash
-dotnet publish "Crypto Hockey.csproj" -c Release -o ./publish
+APP_ENV=production
+DATABASE_URL=sqlite:///./crypto_hockey.db
+REWARD_ISSUER_URL=https://crypto-chess.onrender.com/api/reward-claim
+REWARD_AMOUNT=10
+DEFAULT_NETWORK_CHAIN_ID=1
+SUPPORTED_CHAIN_IDS=1,11155111,137
+ARCADE1870_CONTRACT_ADDRESS=0x8eddD4edea39c5B5f77662453600F53A202EE47C
+REWARD_VAULT_ADDRESS=0x1e4f6e4a382adbdb662733a19ae773d3ab8f497d
 ```
 
-3. Use the provided start command:
+If `REWARD_ISSUER_URL` is unset, reward claims fall back to offline success so gameplay is still testable.
 
-```bash
-dotnet ./publish/Crypto_Hockey.dll --urls http://0.0.0.0:$PORT
-```
+## Render Deployment
 
-4. Set required environment variables in Render:
+This repository now deploys as a **Python** web service.
 
-```bash
-ASPNETCORE_ENVIRONMENT=Production
-ConnectionStrings__DefaultConnection=your_connection_string
-BlockchainConfig__EthereumRpcUrl=https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
-BlockchainConfig__RewardIssuerUrl=https://your-issuer-service/api/reward-claim
-```
+`render.yaml`:
 
-If Render shows `Running 'yarn start'` or complains that `package.json` is missing, the service was created with the wrong runtime and should be recreated or updated to use the .NET configuration above.
+- installs dependencies with `pip install -r requirements.txt`
+- starts the app with `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 
-### Azure Deployment
+If creating the service manually in Render:
 
-```bash
-# Install Azure CLI
-az webapp create --resource-group MyResourceGroup --plan MyAppServicePlan --name crypto-hockey-app
+- Runtime: **Python 3**
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 
-# Deploy
-dotnet publish -c Release
-az webapp deployment source config-zip --resource-group MyResourceGroup --name crypto-hockey-app --src bin/Release/net10.0/publish.zip
-```
+Health check:
 
-### Docker Deployment
+- `/healthz`
 
-Create `Dockerfile`:
+## Notes
 
-```dockerfile
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-WORKDIR /app
-COPY . .
-RUN dotnet publish -c Release -o out
-
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
-WORKDIR /app
-COPY --from=build /app/out .
-EXPOSE 80
-ENTRYPOINT ["dotnet", "Crypto_Hockey.dll"]
-```
-
-Build and run:
-
-```bash
-docker build -t crypto-hockey .
-docker run -p 80:80 crypto-hockey
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-For production, use environment variables instead of appsettings.json:
-
-```bash
-ASPNETCORE_ENVIRONMENT=Production
-BlockchainConfig__Arcade1870ContractAddress=0x8eddD4edea39c5B5f77662453600F53A202EE47C
-BlockchainConfig__EthereumRpcUrl=https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
-ConnectionStrings__DefaultConnection=your_connection_string
-```
-
-## 🧪 Testing
-
-Run unit tests:
-
-```bash
-dotnet test
-```
-
-## 📱 Mobile Support
-
-- Touch controls supported for mobile play
-- Responsive canvas scaling
-- Touch event handling for paddle movement
-
-## 🔐 Security Considerations
-
-- MetaMask ensures secure wallet connection (no private keys shared)
-- Server-side reward validation recommended for production
-- Environment variables for sensitive data
-- HTTPS enforced in production
-- ANTIFORGERY tokens enabled
-
-## 🐛 Troubleshooting
-
-### MetaMask Not Detected
-- Ensure MetaMask extension is installed and enabled
-- Check browser console for JS errors
-- Clear browser cache and reload
-
-### Database Errors
-- Run `dotnet ef database update` to create schema
-- Verify LocalDB is running: `SqlLocalDB.exe start mssqllocaldb`
-
-### Connection Issues
-- Check appsettings.json configuration
-- Verify RPC URL endpoints are working
-- Check firewall rules for HTTPS
-
-## 📈 Future Enhancements
-
-- [x] Multiplayer heads-up arena
-- [x] 8-player tournament mode
-- [ ] NFT rewards for milestones
-- [ ] Advanced statistics and analytics
-- [ ] Seasonal rewards and events
-- [ ] Mobile app (React Native)
-- [ ] DAO governance for game parameters
-
-## 📄 License
-
-This project is provided as-is for educational and entertainment purposes.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow standard Git practices:
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Open a pull request
-
-## 💬 Support
-
-For issues, questions, or suggestions, please open an issue on GitHub or contact the development team.
-
-## 🙏 Acknowledgments
-
-- Built with [Blazor](https://dotnet.microsoft.com/en-us/apps/aspnet/web-apps/blazor)
-- Blockchain integration via [Nethereum](https://nethereum.com/)
-- Web3 wallet support powered by [MetaMask](https://metamask.io/)
-- UI framework [Bootstrap 5](https://getbootstrap.com/)
-
----
-
-**Happy Playing! 🏒⚽💰**
-
-*Crypto Hockey - Where Classic Gaming Meets Web3*
+- Online arena state is in-memory and resets when the app restarts.
+- Static assets remain under `/home/runner/work/Crypto-Hockey/Crypto-Hockey/wwwroot`.
+- Legacy .NET files are still present in the repo history/worktree, but the active web app runtime is Python.

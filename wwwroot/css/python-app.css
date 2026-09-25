@@ -1,0 +1,65 @@
+.site-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10, 18, 36, 0.92);
+    border-bottom: 1px solid rgba(78, 205, 196, 0.2);
+    backdrop-filter: blur(10px);
+}
+
+.site-header__inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.site-brand {
+    color: #4ecdc4;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 1.2rem;
+}
+
+.site-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.site-nav a {
+    color: #d7e8ff;
+    text-decoration: none;
+    padding: 8px 12px;
+    border-radius: 999px;
+}
+
+.site-nav a.active,
+.site-nav a:hover {
+    background: rgba(78, 205, 196, 0.16);
+    color: #4ecdc4;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.game-stage {
+    position: relative;
+}
+
+.status-error {
+    background: rgba(233, 69, 96, 0.12);
+    border-color: rgba(233, 69, 96, 0.4);
+    color: #ff9dad;
+}
+
+@media (max-width: 768px) {
+    .site-header__inner {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

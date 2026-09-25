@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Crypto Hockey{% endblock %}
+
+{% block content %}
+<div class="hero-section">
+    <div class="hero-content">
+        <h1 class="display-4">🏒 Crypto Hockey</h1>
+        <p class="lead">Fast-paced air hockey with MetaMask wallet support, leaderboard tracking, reward claims, and a live online arena.</p>
+
+        <div class="feature-highlights">
+            <div class="feature-card">
+                <h3>⚡ Play &amp; Earn</h3>
+                <p>Beat the AI, record your wins, and request A1870 claim packages from the reward issuer.</p>
+            </div>
+            <div class="feature-card">
+                <h3>🎮 Python 3 Runtime</h3>
+                <p>The app now runs as a FastAPI service on Render while keeping the browser game and wallet experience intact.</p>
+            </div>
+            <div class="feature-card">
+                <h3>♠️ Online Arena</h3>
+                <p>Open heads-up tables and 8-player sit-and-go tournaments with the same GG Poker-style lobby flow.</p>
+            </div>
+            <div class="feature-card">
+                <h3>🏆 Persistent Stats</h3>
+                <p>Track wins, losses, win rate, and total claimed rewards on the leaderboard.</p>
+            </div>
+        </div>
+
+        <div class="cta-buttons">
+            <a href="/game" class="btn btn-primary btn-lg">Start Playing</a>
+            <a href="/leaderboard" class="btn btn-outline-primary btn-lg">View Leaderboard</a>
+            <a href="/online" class="btn btn-outline-primary btn-lg">Enter Online Arena</a>
+        </div>
+    </div>
+</div>
+
+<div class="info-section">
+    <div class="container">
+        <h2>How It Works</h2>
+        <div class="row mt-4">
+            <div class="col-md-4">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <h4>Connect Wallet</h4>
+                    <p>Use MetaMask in the browser to connect your wallet and identify your player profile.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <h4>Play or Compete</h4>
+                    <p>Challenge the AI in the single-player table or jump into the online lobby.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <h4>Win &amp; Claim</h4>
+                    <p>Winning sessions unlock reward-claim requests that use the configured issuer endpoint.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

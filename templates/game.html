@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Crypto Hockey - Play{% endblock %}
+
+{% block content %}
+<div class="game-container">
+    <div class="game-sidebar">
+        <div class="wallet-card" id="wallet-card">
+            <div class="wallet-header">
+                <h3>Wallet Connection</h3>
+            </div>
+            <div class="wallet-disconnected" id="wallet-disconnected">
+                <p>Connect your MetaMask wallet to play and earn rewards.</p>
+                <button class="btn btn-primary btn-lg" id="connect-wallet">Connect MetaMask</button>
+                <p class="warning-text hidden" id="wallet-warning">MetaMask is not installed. <a href="https://metamask.io" target="_blank" rel="noreferrer">Download MetaMask</a></p>
+            </div>
+            <div class="wallet-connected hidden" id="wallet-connected">
+                <div class="wallet-info">
+                    <div class="info-row">
+                        <span class="label">Address:</span>
+                        <span class="address" id="wallet-address">-</span>
+                        <button class="btn btn-sm btn-outline-secondary" id="copy-address" title="Copy Address">📋</button>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Network:</span>
+                        <span class="network" id="wallet-network">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Balance:</span>
+                        <span class="balance" id="wallet-balance">0 ETH</span>
+                    </div>
+                </div>
+                <div class="wallet-actions">
+                    <button class="btn btn-secondary" id="switch-network">Switch Network</button>
+                    <button class="btn btn-danger" id="disconnect-wallet">Disconnect</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="game-stats">
+            <h4>Game Stats</h4>
+            <div class="stats-info" id="player-stats">
+                <p class="text-muted">Connect wallet to see your stats.</p>
+            </div>
+        </div>
+
+        <div class="game-controls">
+            <h4>Game Settings</h4>
+            <div class="form-group">
+                <label for="difficulty">Difficulty:</label>
+                <select id="difficulty" class="form-control">
+                    <option value="Easy">Easy</option>
+                    <option value="Medium" selected>Medium</option>
+                    <option value="Hard">Hard</option>
+                </select>
+            </div>
+
+            <button class="btn btn-success btn-block" id="start-game" disabled>Start Game</button>
+            <button class="btn btn-warning btn-block hidden" id="pause-game">Pause Game</button>
+            <button class="btn btn-primary btn-block hidden" id="resume-game">Resume Game</button>
+            <button class="btn btn-primary btn-block hidden" id="reset-game">Play Again</button>
+            <button class="btn btn-info btn-block hidden" id="claim-reward">Claim Reward</button>
+        </div>
+
+        <div class="alert alert-info hidden" id="game-message"></div>
+    </div>
+
+    <div class="game-area">
+        <div class="game-header">
+            <div class="score-board">
+                <div class="player-score">
+                    <span class="label">You</span>
+                    <span class="score" id="player-score">0</span>
+                </div>
+                <div class="divider">-</div>
+                <div class="opponent-score">
+                    <span class="score" id="opponent-score">0</span>
+                    <span class="label">AI</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="game-stage">
+            <canvas id="game-canvas" width="800" height="400" class="game-canvas"></canvas>
+            <div class="game-over-modal hidden" id="game-over-modal">
+                <div class="game-over-content">
+                    <h2 id="game-over-title">Game Over</h2>
+                    <p class="reward-message hidden" id="reward-message">You earned {{ reward_amount }} A1870 tokens!</p>
+                    <p id="game-over-score">Final Score: 0 - 0</p>
+                    <p class="difficulty-badge" id="game-over-difficulty">Difficulty: Medium</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

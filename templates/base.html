@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Crypto Hockey{% endblock %}</title>
+    <link rel="icon" href="/static/favicon.png">
+    <link rel="stylesheet" href="/static/lib/bootstrap/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/app.css">
+    <link rel="stylesheet" href="/static/css/game-styles.css">
+    <link rel="stylesheet" href="/static/css/python-app.css">
+</head>
+<body data-page="{{ page_name }}">
+    <header class="site-header">
+        <div class="site-header__inner">
+            <a class="site-brand" href="/">🏒 Crypto Hockey</a>
+            <nav class="site-nav">
+                <a href="/" class="{% if page_name == 'home' %}active{% endif %}">Home</a>
+                <a href="/game" class="{% if page_name == 'game' %}active{% endif %}">Game</a>
+                <a href="/leaderboard" class="{% if page_name == 'leaderboard' %}active{% endif %}">Leaderboard</a>
+                <a href="/online" class="{% if page_name == 'online' %}active{% endif %}">Online Arena</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="/static/js/metamask-interop.js"></script>
+    <script src="/static/js/game-renderer.js"></script>
+    <script src="/static/js/crypto-hockey-app.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

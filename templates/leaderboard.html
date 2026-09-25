@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Crypto Hockey - Leaderboard{% endblock %}
+
+{% block content %}
+<div class="leaderboard-container">
+    <h1>🏆 Leaderboard</h1>
+    <p class="lead">Top players by wins and total rewards.</p>
+
+    {% if leaderboard %}
+    <div class="leaderboard-table">
+        <table class="table table-dark table-hover">
+            <thead class="table-primary">
+                <tr>
+                    <th class="rank-col">Rank</th>
+                    <th class="address-col">Player</th>
+                    <th class="stats-col text-center">Wins</th>
+                    <th class="stats-col text-center">Games</th>
+                    <th class="stats-col text-center">Win Rate</th>
+                    <th class="rewards-col text-right">Total Rewards</th>
+                </tr>
+            </thead>
+            <tbody id="leaderboard-body">
+                {% for player in leaderboard %}
+                <tr class="{% if loop.index0 < 3 %}top-{{ loop.index }}{% endif %}">
+                    <td class="rank-col">
+                        {% if loop.index0 == 0 %}
+                        <span class="badge badge-gold">🥇 1st</span>
+                        {% elif loop.index0 == 1 %}
+                        <span class="badge badge-silver">🥈 2nd</span>
+                        {% elif loop.index0 == 2 %}
+                        <span class="badge badge-bronze">🥉 3rd</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ loop.index }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="address-col">{{ player.wallet_address }}</td>
+                    <td class="stats-col text-center"><span class="wins-badge">{{ player.total_wins }}</span></td>
+                    <td class="stats-col text-center">{{ player.total_games }}</td>
+                    <td class="stats-col text-center"><span class="winrate">{{ "%.1f"|format(player.win_rate) }}%</span></td>
+                    <td class="rewards-col text-right"><span class="rewards">{{ "%.2f"|format(player.total_rewards_earned) }}</span><span class="token-symbol">A1870</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info mt-5">
+        <p>No players yet. Be the first to play and join the leaderboard!</p>
+        <a href="/game" class="btn btn-primary">Start Playing</a>
+    </div>
+    {% endif %}
+
+    <div class="leaderboard-footer mt-4">
+        <a href="/" class="btn btn-outline-secondary">Back to Home</a>
+        <button class="btn btn-outline-primary" id="refresh-leaderboard">Refresh</button>
+    </div>
+</div>
+{% endblock %}

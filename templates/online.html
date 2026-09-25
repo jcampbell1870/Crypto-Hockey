@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Crypto Hockey - Online Arena{% endblock %}
+
+{% block content %}
+<script id="initial-lobby-data" type="application/json">{{ initial_lobby|tojson }}</script>
+
+<div class="online-arena-container">
+    <h1>♠️ GG Poker Style Online Arena</h1>
+    <p class="lead">Open heads-up tables or jump into 8-player sit-and-go tournaments.</p>
+
+    <div class="wallet-card" id="wallet-card">
+        <div class="wallet-header">
+            <h3>Wallet Connection</h3>
+        </div>
+        <div class="wallet-disconnected" id="wallet-disconnected">
+            <p>Connect your MetaMask wallet to enter online competition.</p>
+            <button class="btn btn-primary btn-lg" id="connect-wallet">Connect MetaMask</button>
+            <p class="warning-text hidden" id="wallet-warning">MetaMask is not installed. <a href="https://metamask.io" target="_blank" rel="noreferrer">Download MetaMask</a></p>
+        </div>
+        <div class="wallet-connected hidden" id="wallet-connected">
+            <div class="wallet-info">
+                <div class="info-row">
+                    <span class="label">Address:</span>
+                    <span class="address" id="wallet-address">-</span>
+                    <button class="btn btn-sm btn-outline-secondary" id="copy-address" title="Copy Address">📋</button>
+                </div>
+                <div class="info-row">
+                    <span class="label">Network:</span>
+                    <span class="network" id="wallet-network">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Balance:</span>
+                    <span class="balance" id="wallet-balance">0 ETH</span>
+                </div>
+            </div>
+            <div class="wallet-actions">
+                <button class="btn btn-secondary" id="switch-network">Switch Network</button>
+                <button class="btn btn-danger" id="disconnect-wallet">Disconnect</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="online-panel">
+        <div class="alias-row">
+            <label for="screen-name">Screen Name</label>
+            <input id="screen-name" class="form-control" maxlength="24" placeholder="Optional display name">
+            <button class="btn btn-primary" id="save-alias">Save Name</button>
+            <button class="btn btn-outline-primary" id="refresh-lobby">Refresh Lobby</button>
+        </div>
+    </div>
+
+    <div class="alert alert-info mt-2 hidden" id="online-message"></div>
+
+    <div class="online-grid" id="online-grid">
+        <section class="online-panel">
+            <div class="panel-header">
+                <h3>🪑 Heads-Up Tables</h3>
+                <button class="btn btn-success" id="create-heads-up">Open Table</button>
+            </div>
+            <div id="heads-up-list"></div>
+        </section>
+
+        <section class="online-panel">
+            <div class="panel-header">
+                <h3>🏆 8-Player Sit &amp; Go</h3>
+                <button class="btn btn-success" id="create-tournament">Create Tournament</button>
+            </div>
+            <div id="tournament-list"></div>
+        </section>
+    </div>
+</div>
+{% endblock %}

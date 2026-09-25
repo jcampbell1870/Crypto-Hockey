@@ -1,11 +1,13 @@
 services:
   - type: web
     name: crypto-hockey
-    env: dotnet
-    buildCommand: 'dotnet publish "Crypto Hockey.csproj" -c Release -o ./publish'
-    startCommand: 'dotnet ./publish/Crypto_Hockey.dll --urls http://0.0.0.0:$PORT'
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     autoDeploy: true
-    healthCheckPath: /
+    healthCheckPath: /healthz
     envVars:
-      - key: ASPNETCORE_ENVIRONMENT
-        value: Production
+      - key: PYTHON_VERSION
+        value: 3.11.10
+      - key: APP_ENV
+        value: production
