@@ -1,0 +1,43 @@
+name: Dockerfile Path Check
+
+on:
+  pull_request:
+    paths:
+      - "Dockerfile"
+      - ".Dockerfile"
+      - "render.yaml"
+      - ".github/workflows/dockerfile-path-check.yml"
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - "Dockerfile"
+      - ".Dockerfile"
+      - "render.yaml"
+      - ".github/workflows/dockerfile-path-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-dockerfile-paths:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Dockerfile compatibility paths
+        run: |
+          set -euo pipefail
+
+          [ -f "Dockerfile" ] || { echo "Missing required Dockerfile"; exit 1; }
+          [ -f ".Dockerfile" ] || { echo "Missing required .Dockerfile compatibility file"; exit 1; }
+
+          [ -s "Dockerfile" ] || { echo "Dockerfile exists but is empty"; exit 1; }
+          [ -s ".Dockerfile" ] || { echo ".Dockerfile exists but is empty"; exit 1; }
+
+          cmp -s "Dockerfile" ".Dockerfile" || {
+            echo "Dockerfile and .Dockerfile must remain identical to prevent deployment drift"
+            exit 1
+          }
