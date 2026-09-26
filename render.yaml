@@ -10,3 +10,5 @@ services:
         value: cryptohockey.org;www.cryptohockey.org;crypto-hockey.onrender.com
       - key: TRUST_PROXY_HEADERS_FROM_RENDER
         value: "true"
+      - key: BlockchainConfig__RewardIssuerUrl
+        sync: false

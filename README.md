@@ -206,10 +206,12 @@ ASPNETCORE_ENVIRONMENT=Production
 AllowedHosts=cryptohockey.org;www.cryptohockey.org;crypto-hockey.onrender.com
 BlockchainConfig__Arcade1870ContractAddress=0x8eddD4edea39c5B5f77662453600F53A202EE47C
 BlockchainConfig__RewardVaultAddress=0x1e4f6e4a382adbdb662733a19ae773d3ab8f497d
-BlockchainConfig__RewardIssuerUrl=https://crypto-chess.onrender.com/api/reward-claim
+BlockchainConfig__RewardIssuerUrl=https://<your-reward-issuer-host>/api/reward-claim
 BlockchainConfig__EthereumRpcUrl=https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
 ConnectionStrings__DefaultConnection=your_connection_string
 ```
+
+`BlockchainConfig__RewardIssuerUrl` must point to your live reward issuer endpoint. If it is missing or invalid, reward payouts will fail.
 
 Production defaults for the Cloudflare + Render deployment live in `appsettings.Production.json`, with `AllowedHosts` set to `cryptohockey.org`, `www.cryptohockey.org`, and `crypto-hockey.onrender.com` so MetaMask deep-link/browser flows can still reach the Render hostname.
 If `ConnectionStrings__DefaultConnection` is not set to a production-ready SQL Server connection string, the app now falls back to a local SQLite database file so wallet-connected gameplay can still create player profiles and game sessions on Render. The fallback database is recreated from the current model at startup, so configure a managed SQL Server connection string when you need persistent production data across restarts or deploys.

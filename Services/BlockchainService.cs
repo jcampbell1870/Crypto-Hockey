@@ -80,12 +80,27 @@ public class BlockchainService : IBlockchainService
 
             if (string.IsNullOrWhiteSpace(_config.RewardIssuerUrl))
             {
-                _logger.LogWarning("Reward issuer URL is not configured; using offline success fallback.");
-                return new RewardClaimResult { IsSuccessful = true };
+                _logger.LogError("Reward issuer URL is not configured.");
+                return new RewardClaimResult
+                {
+                    IsSuccessful = false,
+                    ErrorMessage = "Reward issuer is not configured. Please contact support."
+                };
+            }
+
+            if (!Uri.TryCreate(_config.RewardIssuerUrl, UriKind.Absolute, out var rewardIssuerUri)
+                || (rewardIssuerUri.Scheme != Uri.UriSchemeHttps && rewardIssuerUri.Scheme != Uri.UriSchemeHttp))
+            {
+                _logger.LogError("Reward issuer URL is invalid: {RewardIssuerUrl}", _config.RewardIssuerUrl);
+                return new RewardClaimResult
+                {
+                    IsSuccessful = false,
+                    ErrorMessage = "Reward issuer configuration is invalid. Please contact support."
+                };
             }
 
             var client = _httpClientFactory.CreateClient();
-            using var response = await client.PostAsJsonAsync(_config.RewardIssuerUrl, new
+            using var response = await client.PostAsJsonAsync(rewardIssuerUri, new
             {
                 recipient = walletAddress,
                 game = new
