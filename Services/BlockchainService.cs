@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Linq;
 using Crypto_Hockey.Models;
 using Microsoft.Extensions.Options;
 using Nethereum.Contracts.Standards.ERC20.ContractDefinition;
@@ -257,6 +258,18 @@ public class BlockchainService : IBlockchainService
         if (string.IsNullOrWhiteSpace(payload.Signature))
         {
             error = "Reward claim payload is missing signature.";
+            return false;
+        }
+
+        var signature = payload.Signature.Trim();
+        if (signature.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+        {
+            signature = signature[2..];
+        }
+
+        if (signature.Length != 130 || !signature.All(Uri.IsHexDigit))
+        {
+            error = "Reward claim payload contains an invalid signature.";
             return false;
         }
 
