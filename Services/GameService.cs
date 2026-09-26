@@ -270,14 +270,17 @@ public class GameService : IGameService
         }
 
         var encoder = new FunctionCallEncoder();
+        var parameters = new[]
+        {
+            new Parameter("uint256", 1),
+            new Parameter("uint256", 2),
+            new Parameter("uint256", 3),
+            new Parameter("bytes", 4)
+        };
+
         return encoder.EncodeRequest(
-            "claim",
-            [
-                new Parameter("uint256", 1),
-                new Parameter("uint256", 2),
-                new Parameter("uint256", 3),
-                new Parameter("bytes", 4)
-            ],
+            new FunctionABI("claim", false) { InputParameters = parameters }.Sha3Signature,
+            parameters,
             [
                 amount,
                 nonce,
