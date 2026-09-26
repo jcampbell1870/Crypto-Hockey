@@ -44,6 +44,12 @@
                     }
                 </div>
             }
+            @if (!string.IsNullOrWhiteSpace(rewardWarningMessage))
+            {
+                <div class="alert alert-warning" role="alert">
+                    @rewardWarningMessage
+                </div>
+            }
             @if (!string.IsNullOrWhiteSpace(rewardStatusMessage))
             {
                <div class="alert @(rewardClaimed ? "alert-success" : "alert-info")" role="status" aria-live="polite">
@@ -144,6 +150,7 @@
     private string selectedDifficulty = "Medium";
     private int? currentSessionId;
     private string? gameErrorMessage;
+    private string? rewardWarningMessage;
     private string? rewardStatusMessage;
     private string? rewardDiagnosticHint;
     private string? rewardTransactionHash;
@@ -210,6 +217,7 @@
         try
         {
             gameErrorMessage = null;
+            rewardWarningMessage = null;
             rewardDiagnosticHint = null;
 
             // Get or create player profile
@@ -228,6 +236,7 @@
             playerScore = 0;
             opponentScore = 0;
             rewardStatusMessage = null;
+            rewardWarningMessage = null;
             rewardTransactionHash = null;
             rewardExplorerUrl = null;
             lastFrameTime = DateTime.UtcNow;
@@ -341,6 +350,7 @@
         opponentScore = 0;
         currentSessionId = null;
         gameErrorMessage = null;
+        rewardWarningMessage = null;
         rewardStatusMessage = null;
         rewardDiagnosticHint = null;
         rewardTransactionHash = null;
@@ -363,6 +373,7 @@
         {
             rewardClaimInProgress = true;
             gameErrorMessage = null;
+            rewardWarningMessage = null;
             rewardDiagnosticHint = null;
             rewardStatusMessage = "Preparing your reward claim...";
             rewardTransactionHash = null;
@@ -374,6 +385,7 @@
             {
                 rewardStatusMessage = null;
                 gameErrorMessage = preparedClaim.ErrorMessage ?? "Reward payout could not be prepared right now. You can retry below.";
+                rewardWarningMessage = null;
                 rewardDiagnosticHint = preparedClaim.DiagnosticHint;
                 return;
             }
@@ -393,6 +405,7 @@
                 {
                     rewardClaimed = true;
                     rewardStatusMessage = "Reward claim submitted.";
+                    rewardWarningMessage = null;
                     rewardDiagnosticHint = null;
                     rewardTransactionHash = walletResult.TransactionHash;
                     rewardExplorerUrl = BuildExplorerTransactionUrl(
@@ -408,6 +421,7 @@
                 {
                     rewardStatusMessage = null;
                     gameErrorMessage = "Reward transaction was submitted, but the game could not record it. Please contact support with the transaction hash.";
+                    rewardWarningMessage = null;
                     rewardDiagnosticHint = null;
                     Logger.LogError(
                         "Reward claim transaction {TransactionHash} submitted for session {SessionId} but completion could not be recorded.",
@@ -418,9 +432,19 @@
             else
             {
                 rewardStatusMessage = null;
-                gameErrorMessage = string.IsNullOrWhiteSpace(walletResult.ErrorMessage)
+                var walletError = string.IsNullOrWhiteSpace(walletResult.ErrorMessage)
                     ? "Reward payout could not be completed right now. You can retry below."
                     : walletResult.ErrorMessage;
+                if (TryParseLowGasWarning(walletError, out var lowGasWarning))
+                {
+                    rewardWarningMessage = lowGasWarning;
+                    gameErrorMessage = null;
+                }
+                else
+                {
+                    rewardWarningMessage = null;
+                    gameErrorMessage = walletError;
+                }
                 rewardDiagnosticHint = null;
                 rewardTransactionHash = null;
                 rewardExplorerUrl = null;
@@ -430,6 +454,7 @@
         {
             rewardStatusMessage = null;
             gameErrorMessage = "Reward payout failed. Please try again shortly.";
+            rewardWarningMessage = null;
             rewardDiagnosticHint = null;
             rewardTransactionHash = null;
             rewardExplorerUrl = null;
@@ -458,6 +483,24 @@
         };
 
         return baseUrl is null ? null : $"{baseUrl}{transactionHash}";
+    }
+
+    private static bool TryParseLowGasWarning(string? errorMessage, out string? warning)
+    {
+        warning = null;
+        if (string.IsNullOrWhiteSpace(errorMessage))
+        {
+            return false;
+        }
+
+        const string marker = "[LOW_GAS]";
+        if (!errorMessage.StartsWith(marker, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        warning = errorMessage[marker.Length..].Trim();
+        return !string.IsNullOrWhiteSpace(warning);
     }
 
     async ValueTask IAsyncDisposable.DisposeAsync()

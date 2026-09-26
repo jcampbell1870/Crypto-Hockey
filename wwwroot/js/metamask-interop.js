@@ -263,6 +263,24 @@ window.metamaskInterop = {
         return chains[chainId] || 'Unknown Network';
     },
 
+    getNativeTokenSymbol: function (chainId) {
+        const nativeTokens = {
+            1: 'ETH',
+            11155111: 'Sepolia ETH',
+            137: 'POL'
+        };
+        return nativeTokens[chainId] || 'native token';
+    },
+
+    formatWeiToNative: function (valueWei, precision = 6) {
+        const wei = BigInt(valueWei);
+        const divisor = 1000000000000000000n;
+        const whole = wei / divisor;
+        const fraction = wei % divisor;
+        const fractionText = fraction.toString().padStart(18, '0').slice(0, precision).replace(/0+$/, '');
+        return fractionText.length > 0 ? `${whole.toString()}.${fractionText}` : whole.toString();
+    },
+
     // Helper: Get chain configuration for adding to MetaMask
     getChainData: function (chainId) {
         const chainDataMap = {
@@ -352,13 +370,48 @@ window.metamaskInterop = {
                 throw new Error('No accounts found');
             }
 
+            const txParams = {
+                from: accounts[0],
+                to: request.vaultAddress,
+                data: request.data
+            };
+
+            const [estimatedGasHex, gasPriceHex, balanceHex] = await Promise.all([
+                provider.request({
+                    method: 'eth_estimateGas',
+                    params: [txParams]
+                }),
+                provider.request({
+                    method: 'eth_gasPrice'
+                }),
+                provider.request({
+                    method: 'eth_getBalance',
+                    params: [accounts[0], 'latest']
+                })
+            ]);
+
+            const estimatedGasWei = BigInt(estimatedGasHex);
+            const gasPriceWei = BigInt(gasPriceHex);
+            const availableBalanceWei = BigInt(balanceHex);
+            const estimatedFeeWei = estimatedGasWei * gasPriceWei;
+            const estimatedFeeWithBufferWei = estimatedFeeWei + (estimatedFeeWei / 5n);
+
+            if (availableBalanceWei < estimatedFeeWithBufferWei) {
+                const chainName = this.getChainName(request.chainId);
+                const nativeToken = this.getNativeTokenSymbol(request.chainId);
+                const required = this.formatWeiToNative(estimatedFeeWithBufferWei);
+                const available = this.formatWeiToNative(availableBalanceWei);
+
+                return {
+                    isSuccessful: false,
+                    transactionHash: null,
+                    errorMessage: `[LOW_GAS] Insufficient ${nativeToken} for gas on ${chainName}. Estimated needed: ~${required} ${nativeToken}; current wallet balance: ~${available} ${nativeToken}.`
+                };
+            }
+
             const txHash = await provider.request({
                 method: 'eth_sendTransaction',
-                params: [{
-                    from: accounts[0],
-                    to: request.vaultAddress,
-                    data: request.data
-                }],
+                params: [txParams],
             });
 
             return {
