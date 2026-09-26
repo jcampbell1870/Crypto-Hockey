@@ -263,6 +263,24 @@ window.metamaskInterop = {
         return chains[chainId] || 'Unknown Network';
     },
 
+    getNativeTokenSymbol: function (chainId) {
+        const nativeTokens = {
+            1: 'ETH',
+            11155111: 'Sepolia ETH',
+            137: 'POL'
+        };
+        return nativeTokens[chainId] || 'native token';
+    },
+
+    formatWeiToNative: function (valueWei, precision = 6) {
+        const wei = BigInt(valueWei);
+        const divisor = 1000000000000000000n;
+        const whole = wei / divisor;
+        const fraction = wei % divisor;
+        const fractionText = fraction.toString().padStart(18, '0').slice(0, precision).replace(/0+$/, '');
+        return fractionText.length > 0 ? `${whole.toString()}.${fractionText}` : whole.toString();
+    },
+
     // Helper: Get chain configuration for adding to MetaMask
     getChainData: function (chainId) {
         const chainDataMap = {
@@ -352,25 +370,88 @@ window.metamaskInterop = {
                 throw new Error('No accounts found');
             }
 
+            const txParams = {
+                from: accounts[0],
+                to: request.vaultAddress,
+                data: request.data
+            };
+
+            const [estimatedGasHex, gasPriceHex, latestBlock, priorityFeeHex, balanceHex] = await Promise.all([
+                provider.request({
+                    method: 'eth_estimateGas',
+                    params: [txParams]
+                }),
+                provider.request({
+                    method: 'eth_gasPrice'
+                }),
+                provider.request({
+                    method: 'eth_getBlockByNumber',
+                    params: ['latest', false]
+                }),
+                provider.request({
+                    method: 'eth_maxPriorityFeePerGas'
+                }).catch(() => null),
+                provider.request({
+                    method: 'eth_getBalance',
+                    params: [accounts[0], 'latest']
+                })
+            ]);
+
+            const estimatedGasWei = BigInt(estimatedGasHex);
+            const gasPriceWei = BigInt(gasPriceHex);
+            const availableBalanceWei = BigInt(balanceHex);
+            const baseFeeWei = latestBlock && latestBlock.baseFeePerGas
+                ? BigInt(latestBlock.baseFeePerGas)
+                : null;
+            const priorityFeeWei = priorityFeeHex
+                ? BigInt(priorityFeeHex)
+                : (gasPriceWei > 0n ? gasPriceWei / 10n : 1500000000n);
+            const effectiveGasPriceWei = baseFeeWei === null
+                ? gasPriceWei
+                : (baseFeeWei * 2n) + priorityFeeWei;
+            const estimatedFeeWei = estimatedGasWei * effectiveGasPriceWei;
+
+            txParams.gas = `0x${estimatedGasWei.toString(16)}`;
+            if (baseFeeWei !== null) {
+                txParams.type = '0x2';
+                txParams.maxPriorityFeePerGas = `0x${priorityFeeWei.toString(16)}`;
+                txParams.maxFeePerGas = `0x${effectiveGasPriceWei.toString(16)}`;
+            } else {
+                txParams.gasPrice = `0x${effectiveGasPriceWei.toString(16)}`;
+            }
+
+            if (availableBalanceWei < estimatedFeeWei) {
+                const chainName = this.getChainName(request.chainId);
+                const nativeToken = this.getNativeTokenSymbol(request.chainId);
+                const required = this.formatWeiToNative(estimatedFeeWei);
+                const available = this.formatWeiToNative(availableBalanceWei);
+
+                return {
+                    isSuccessful: false,
+                    transactionHash: null,
+                    errorCode: 'LOW_GAS',
+                    errorMessage: `Insufficient ${nativeToken} for gas on ${chainName}. Estimated needed: ~${required} ${nativeToken}; current wallet balance: ~${available} ${nativeToken}.`
+                };
+            }
+
             const txHash = await provider.request({
                 method: 'eth_sendTransaction',
-                params: [{
-                    from: accounts[0],
-                    to: request.vaultAddress,
-                    data: request.data
-                }],
+                params: [txParams],
             });
 
             return {
                 isSuccessful: true,
                 transactionHash: txHash,
+                errorCode: null,
                 errorMessage: null
             };
         } catch (error) {
             console.error('Error submitting reward claim:', error);
 
+            let errorCode = null;
             let errorMessage = 'Reward transaction could not be submitted.';
             if (error && error.code === 4001) {
+                errorCode = 'USER_REJECTED';
                 errorMessage = 'Reward claim was cancelled in MetaMask.';
             } else if (error && typeof error.message === 'string' && error.message.trim().length > 0) {
                 errorMessage = error.message;
@@ -379,6 +460,7 @@ window.metamaskInterop = {
             return {
                 isSuccessful: false,
                 transactionHash: null,
+                errorCode: errorCode,
                 errorMessage: errorMessage
             };
         }

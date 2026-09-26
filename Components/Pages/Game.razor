@@ -44,10 +44,30 @@
                     }
                 </div>
             }
+            @if (!string.IsNullOrWhiteSpace(rewardWarningMessage))
+            {
+                <div class="alert alert-warning" role="alert">
+                    @rewardWarningMessage
+                </div>
+            }
             @if (!string.IsNullOrWhiteSpace(rewardStatusMessage))
             {
                <div class="alert @(rewardClaimed ? "alert-success" : "alert-info")" role="status" aria-live="polite">
                    @rewardStatusMessage
+                   @if (rewardClaimed && !string.IsNullOrWhiteSpace(rewardTransactionHash))
+                   {
+                       <div class="mt-2 small">
+                           Transaction:
+                           @if (!string.IsNullOrWhiteSpace(rewardExplorerUrl))
+                           {
+                               <a href="@rewardExplorerUrl" target="_blank" rel="noopener noreferrer">@rewardTransactionHash</a>
+                           }
+                           else
+                           {
+                               <code>@rewardTransactionHash</code>
+                           }
+                       </div>
+                   }
                </div>
             }
             <div class="form-group">
@@ -130,8 +150,11 @@
     private string selectedDifficulty = "Medium";
     private int? currentSessionId;
     private string? gameErrorMessage;
+    private string? rewardWarningMessage;
     private string? rewardStatusMessage;
     private string? rewardDiagnosticHint;
+    private string? rewardTransactionHash;
+    private string? rewardExplorerUrl;
 
     private CancellationTokenSource? gameLoopCts;
     private DateTime lastFrameTime = DateTime.UtcNow;
@@ -194,6 +217,7 @@
         try
         {
             gameErrorMessage = null;
+            rewardWarningMessage = null;
             rewardDiagnosticHint = null;
 
             // Get or create player profile
@@ -212,6 +236,9 @@
             playerScore = 0;
             opponentScore = 0;
             rewardStatusMessage = null;
+            rewardWarningMessage = null;
+            rewardTransactionHash = null;
+            rewardExplorerUrl = null;
             lastFrameTime = DateTime.UtcNow;
 
             gameLoopCts = new CancellationTokenSource();
@@ -323,8 +350,11 @@
         opponentScore = 0;
         currentSessionId = null;
         gameErrorMessage = null;
+        rewardWarningMessage = null;
         rewardStatusMessage = null;
         rewardDiagnosticHint = null;
+        rewardTransactionHash = null;
+        rewardExplorerUrl = null;
     }
 
     private Task RetryRewardClaim()
@@ -343,8 +373,11 @@
         {
             rewardClaimInProgress = true;
             gameErrorMessage = null;
+            rewardWarningMessage = null;
             rewardDiagnosticHint = null;
             rewardStatusMessage = "Preparing your reward claim...";
+            rewardTransactionHash = null;
+            rewardExplorerUrl = null;
             await InvokeAsync(StateHasChanged);
 
             var preparedClaim = await GameService.PrepareRewardClaimAsync(currentSessionId.Value, currentWalletState.Address!);
@@ -352,6 +385,7 @@
             {
                 rewardStatusMessage = null;
                 gameErrorMessage = preparedClaim.ErrorMessage ?? "Reward payout could not be prepared right now. You can retry below.";
+                rewardWarningMessage = null;
                 rewardDiagnosticHint = preparedClaim.DiagnosticHint;
                 return;
             }
@@ -370,8 +404,13 @@
                 if (completed)
                 {
                     rewardClaimed = true;
-                    rewardStatusMessage = $"Reward claim submitted. View transaction: {walletResult.TransactionHash}";
+                    rewardStatusMessage = "Reward claim submitted.";
+                    rewardWarningMessage = null;
                     rewardDiagnosticHint = null;
+                    rewardTransactionHash = walletResult.TransactionHash;
+                    rewardExplorerUrl = BuildExplorerTransactionUrl(
+                        preparedClaim.Transaction.ChainId,
+                        walletResult.TransactionHash);
 
                     if (currentWalletState.IsConnected)
                     {
@@ -382,6 +421,7 @@
                 {
                     rewardStatusMessage = null;
                     gameErrorMessage = "Reward transaction was submitted, but the game could not record it. Please contact support with the transaction hash.";
+                    rewardWarningMessage = null;
                     rewardDiagnosticHint = null;
                     Logger.LogError(
                         "Reward claim transaction {TransactionHash} submitted for session {SessionId} but completion could not be recorded.",
@@ -392,17 +432,32 @@
             else
             {
                 rewardStatusMessage = null;
-                gameErrorMessage = string.IsNullOrWhiteSpace(walletResult.ErrorMessage)
+                var walletError = string.IsNullOrWhiteSpace(walletResult.ErrorMessage)
                     ? "Reward payout could not be completed right now. You can retry below."
                     : walletResult.ErrorMessage;
+                if (string.Equals(walletResult.ErrorCode, "LOW_GAS", StringComparison.Ordinal))
+                {
+                    rewardWarningMessage = walletError;
+                    gameErrorMessage = null;
+                }
+                else
+                {
+                    rewardWarningMessage = null;
+                    gameErrorMessage = walletError;
+                }
                 rewardDiagnosticHint = null;
+                rewardTransactionHash = null;
+                rewardExplorerUrl = null;
             }
         }
         catch (Exception ex)
         {
             rewardStatusMessage = null;
             gameErrorMessage = "Reward payout failed. Please try again shortly.";
+            rewardWarningMessage = null;
             rewardDiagnosticHint = null;
+            rewardTransactionHash = null;
+            rewardExplorerUrl = null;
             Logger.LogError(ex, "Error claiming reward for session {SessionId}", currentSessionId);
         }
         finally
@@ -410,6 +465,24 @@
             rewardClaimInProgress = false;
             await InvokeAsync(StateHasChanged);
         }
+    }
+
+    private static string? BuildExplorerTransactionUrl(int chainId, string transactionHash)
+    {
+        if (string.IsNullOrWhiteSpace(transactionHash))
+        {
+            return null;
+        }
+
+        var baseUrl = chainId switch
+        {
+            1 => "https://etherscan.io/tx/",
+            11155111 => "https://sepolia.etherscan.io/tx/",
+            137 => "https://polygonscan.com/tx/",
+            _ => null
+        };
+
+        return baseUrl is null ? null : $"{baseUrl}{transactionHash}";
     }
 
     async ValueTask IAsyncDisposable.DisposeAsync()
