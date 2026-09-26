@@ -78,25 +78,21 @@ app.MapGet(
     async (IOptions<BlockchainConfig> blockchainOptions, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken) =>
     {
         var issuerUrl = blockchainOptions.Value.RewardIssuerUrl;
-        if (string.IsNullOrWhiteSpace(issuerUrl))
-        {
-            return Results.Problem(
-                title: "Reward issuer is not configured",
-                detail: "Set BlockchainConfig__RewardIssuerUrl to enable reward payouts.",
-                statusCode: StatusCodes.Status503ServiceUnavailable);
-        }
-
-        if (!Uri.TryCreate(issuerUrl, UriKind.Absolute, out var issuerUri))
+        if (!RewardIssuerEndpointResolver.TryGetCandidateUris(
+                issuerUrl,
+                out var issuerUris,
+                out var validationError))
         {
             return Results.Problem(
                 title: "Reward issuer URL is invalid",
-                detail: $"Configured value '{issuerUrl}' is not a valid absolute URL.",
+                detail: validationError,
                 statusCode: StatusCodes.Status500InternalServerError);
         }
 
         try
         {
             var client = httpClientFactory.CreateClient();
+            var issuerUri = issuerUris[0];
             using var request = new HttpRequestMessage(HttpMethod.Get, issuerUri);
             using var response = await client.SendAsync(
                 request,
@@ -105,8 +101,9 @@ app.MapGet(
 
             return Results.Json(new
             {
-                status = response.IsSuccessStatusCode ? "healthy" : "degraded",
-                issuerUrl,
+                status = (int)response.StatusCode >= 500 ? "degraded" : "healthy",
+                issuerUrl = issuerUri.ToString(),
+                configuredIssuerUrl = issuerUrl,
                 statusCode = (int)response.StatusCode
             });
         }
