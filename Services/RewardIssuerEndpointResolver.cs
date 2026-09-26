@@ -58,12 +58,21 @@ public static class RewardIssuerEndpointResolver
 
     private static bool TryCreateAbsoluteUri(string normalized, out Uri issuerUri)
     {
-        if (Uri.TryCreate(normalized, UriKind.Absolute, out issuerUri))
+        issuerUri = null!;
+
+        if (Uri.TryCreate(normalized, UriKind.Absolute, out var directUri) && directUri is not null)
         {
+            issuerUri = directUri;
             return true;
         }
 
-        return Uri.TryCreate($"https://{normalized}", UriKind.Absolute, out issuerUri);
+        if (Uri.TryCreate($"https://{normalized}", UriKind.Absolute, out var httpsUri) && httpsUri is not null)
+        {
+            issuerUri = httpsUri;
+            return true;
+        }
+
+        return false;
     }
 
     private static bool ShouldAppendRewardClaimPath(Uri uri)
