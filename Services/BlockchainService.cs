@@ -78,29 +78,23 @@ public class BlockchainService : IBlockchainService
                 };
             }
 
-            if (string.IsNullOrWhiteSpace(_config.RewardIssuerUrl))
+            if (!RewardIssuerEndpointResolver.TryGetCandidateUris(
+                    _config.RewardIssuerUrl,
+                    out var rewardIssuerUris,
+                    out var rewardIssuerValidationError))
             {
-                _logger.LogError("Reward issuer URL is not configured.");
+                _logger.LogError("{RewardIssuerValidationError}", rewardIssuerValidationError);
                 return new RewardClaimResult
                 {
                     IsSuccessful = false,
-                    ErrorMessage = "Reward issuer is not configured. Please contact support."
-                };
-            }
-
-            if (!Uri.TryCreate(_config.RewardIssuerUrl, UriKind.Absolute, out var rewardIssuerUri)
-                || (rewardIssuerUri.Scheme != Uri.UriSchemeHttps && rewardIssuerUri.Scheme != Uri.UriSchemeHttp))
-            {
-                _logger.LogError("Reward issuer URL is invalid: {RewardIssuerUrl}", _config.RewardIssuerUrl);
-                return new RewardClaimResult
-                {
-                    IsSuccessful = false,
-                    ErrorMessage = "Reward issuer configuration is invalid. Please contact support."
+                    ErrorMessage = "Reward issuer configuration is invalid. Please contact support.",
+                    DiagnosticHint = $"Configured issuer URL: {_config.RewardIssuerUrl}"
                 };
             }
 
             var client = _httpClientFactory.CreateClient();
-            using var response = await client.PostAsJsonAsync(rewardIssuerUri, new
+            var resolvedIssuerEndpoints = string.Join(", ", rewardIssuerUris.Select(uri => uri.ToString()));
+            var claimRequest = new
             {
                 recipient = walletAddress,
                 game = new
@@ -113,54 +107,81 @@ public class BlockchainService : IBlockchainService
                     completedAt = gameProof.CompletedAt,
                     playerWon = gameProof.PlayerWon
                 }
-            });
+            };
 
-            if (!response.IsSuccessStatusCode)
+            for (var issuerIndex = 0; issuerIndex < rewardIssuerUris.Count; issuerIndex++)
             {
-                var rawError = await response.Content.ReadAsStringAsync();
-                _logger.LogError(
-                    "Reward issuer rejected claim for {WalletAddress}. Status {StatusCode}: {Error}",
-                    walletAddress,
-                    (int)response.StatusCode,
-                    rawError);
+                var rewardIssuerUri = rewardIssuerUris[issuerIndex];
+                using var response = await client.PostAsJsonAsync(rewardIssuerUri, claimRequest);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var rawError = await response.Content.ReadAsStringAsync();
+                    _logger.LogError(
+                        "Reward issuer rejected claim for {WalletAddress}. Endpoint {IssuerEndpoint}. Status {StatusCode}: {Error}",
+                        walletAddress,
+                        rewardIssuerUri,
+                        (int)response.StatusCode,
+                        rawError);
+
+                    var canTryFallbackEndpoint =
+                        issuerIndex < rewardIssuerUris.Count - 1
+                        && (response.StatusCode == System.Net.HttpStatusCode.NotFound
+                            || response.StatusCode == System.Net.HttpStatusCode.MethodNotAllowed);
+
+                    if (canTryFallbackEndpoint)
+                    {
+                        continue;
+                    }
+
+                    return new RewardClaimResult
+                    {
+                        IsSuccessful = false,
+                        ErrorMessage = string.IsNullOrWhiteSpace(rawError)
+                            ? $"Issuer error {(int)response.StatusCode}."
+                            : rawError,
+                        DiagnosticHint = $"Resolved issuer endpoint(s): {resolvedIssuerEndpoints}. Last attempted: {rewardIssuerUri}"
+                    };
+                }
+
+                var payload = await response.Content.ReadFromJsonAsync<RewardClaimPayload>(JsonOptions);
+                if (payload == null)
+                {
+                    return new RewardClaimResult
+                    {
+                        IsSuccessful = false,
+                        ErrorMessage = "Reward issuer response was empty.",
+                        DiagnosticHint = $"Resolved issuer endpoint(s): {resolvedIssuerEndpoints}. Last attempted: {rewardIssuerUri}"
+                    };
+                }
+
+                if (!TryValidateClaimPayload(payload, out var validationError))
+                {
+                    _logger.LogError(
+                        "Reward issuer returned invalid claim payload for {WalletAddress}: {ValidationError}",
+                        walletAddress,
+                        validationError);
+
+                    return new RewardClaimResult
+                    {
+                        IsSuccessful = false,
+                        ErrorMessage = validationError,
+                        DiagnosticHint = $"Resolved issuer endpoint(s): {resolvedIssuerEndpoints}. Last attempted: {rewardIssuerUri}"
+                    };
+                }
 
                 return new RewardClaimResult
                 {
-                    IsSuccessful = false,
-                    ErrorMessage = string.IsNullOrWhiteSpace(rawError)
-                        ? $"Issuer error {(int)response.StatusCode}."
-                        : rawError
-                };
-            }
-
-            var payload = await response.Content.ReadFromJsonAsync<RewardClaimPayload>(JsonOptions);
-            if (payload == null)
-            {
-                return new RewardClaimResult
-                {
-                    IsSuccessful = false,
-                    ErrorMessage = "Reward issuer response was empty."
-                };
-            }
-
-            if (!TryValidateClaimPayload(payload, out var validationError))
-            {
-                _logger.LogError(
-                    "Reward issuer returned invalid claim payload for {WalletAddress}: {ValidationError}",
-                    walletAddress,
-                    validationError);
-
-                return new RewardClaimResult
-                {
-                    IsSuccessful = false,
-                    ErrorMessage = validationError
+                    IsSuccessful = true,
+                    Payload = payload
                 };
             }
 
             return new RewardClaimResult
             {
-                IsSuccessful = true,
-                Payload = payload
+                IsSuccessful = false,
+                ErrorMessage = "Reward issuer did not provide a valid claim endpoint.",
+                DiagnosticHint = $"Resolved issuer endpoint(s): {resolvedIssuerEndpoints}"
             };
         }
         catch (Exception ex)
@@ -169,7 +190,8 @@ public class BlockchainService : IBlockchainService
             return new RewardClaimResult
             {
                 IsSuccessful = false,
-                ErrorMessage = ex.Message
+                ErrorMessage = ex.Message,
+                DiagnosticHint = $"Configured issuer URL: {_config.RewardIssuerUrl}"
             };
         }
     }

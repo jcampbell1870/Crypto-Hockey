@@ -25,6 +25,7 @@ public class RewardClaimResult
 {
     public bool IsSuccessful { get; set; }
     public string? ErrorMessage { get; set; }
+    public string? DiagnosticHint { get; set; }
     public RewardClaimPayload? Payload { get; set; }
 }
 
@@ -39,6 +40,7 @@ public class PreparedRewardClaimResult
 {
     public bool IsSuccessful { get; set; }
     public string? ErrorMessage { get; set; }
+    public string? DiagnosticHint { get; set; }
     public RewardClaimPayload? Payload { get; set; }
     public RewardClaimTransactionRequest? Transaction { get; set; }
 }
