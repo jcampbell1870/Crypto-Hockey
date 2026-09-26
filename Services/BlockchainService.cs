@@ -80,12 +80,27 @@ public class BlockchainService : IBlockchainService
 
             if (string.IsNullOrWhiteSpace(_config.RewardIssuerUrl))
             {
-                _logger.LogWarning("Reward issuer URL is not configured; using offline success fallback.");
-                return new RewardClaimResult { IsSuccessful = true };
+                _logger.LogError("Reward issuer URL is not configured.");
+                return new RewardClaimResult
+                {
+                    IsSuccessful = false,
+                    ErrorMessage = "Reward issuer is not configured. Please contact support."
+                };
+            }
+
+            if (!Uri.TryCreate(_config.RewardIssuerUrl, UriKind.Absolute, out var rewardIssuerUri)
+                || (rewardIssuerUri.Scheme != Uri.UriSchemeHttps && rewardIssuerUri.Scheme != Uri.UriSchemeHttp))
+            {
+                _logger.LogError("Reward issuer URL is invalid: {RewardIssuerUrl}", _config.RewardIssuerUrl);
+                return new RewardClaimResult
+                {
+                    IsSuccessful = false,
+                    ErrorMessage = "Reward issuer configuration is invalid. Please contact support."
+                };
             }
 
             var client = _httpClientFactory.CreateClient();
-            using var response = await client.PostAsJsonAsync(_config.RewardIssuerUrl, new
+            using var response = await client.PostAsJsonAsync(rewardIssuerUri, new
             {
                 recipient = walletAddress,
                 game = new
@@ -125,6 +140,20 @@ public class BlockchainService : IBlockchainService
                 {
                     IsSuccessful = false,
                     ErrorMessage = "Reward issuer response was empty."
+                };
+            }
+
+            if (!TryValidateClaimPayload(payload, out var validationError))
+            {
+                _logger.LogError(
+                    "Reward issuer returned invalid claim payload for {WalletAddress}: {ValidationError}",
+                    walletAddress,
+                    validationError);
+
+                return new RewardClaimResult
+                {
+                    IsSuccessful = false,
+                    ErrorMessage = validationError
                 };
             }
 
@@ -193,5 +222,61 @@ public class BlockchainService : IBlockchainService
             137 => _config.PolygonRpcUrl,
             _ => string.Empty
         };
+    }
+
+    private bool TryValidateClaimPayload(RewardClaimPayload payload, out string error)
+    {
+        if (string.IsNullOrWhiteSpace(payload.Nonce))
+        {
+            error = "Reward claim payload is missing nonce.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(payload.Signature))
+        {
+            error = "Reward claim payload is missing signature.";
+            return false;
+        }
+
+        if (!decimal.TryParse(payload.Amount, out var amount) || amount <= 0)
+        {
+            error = "Reward claim payload contains an invalid amount.";
+            return false;
+        }
+
+        if (!IsValidAddress(payload.VaultAddress))
+        {
+            error = "Reward claim payload contains an invalid vault address.";
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_config.RewardVaultAddress)
+            && !string.Equals(_config.RewardVaultAddress, payload.VaultAddress, StringComparison.OrdinalIgnoreCase))
+        {
+            error = "Reward claim payload vault does not match configured reward vault.";
+            return false;
+        }
+
+        if (payload.ChainId <= 0)
+        {
+            error = "Reward claim payload contains an invalid chain id.";
+            return false;
+        }
+
+        if (_config.SupportedChainIds.Length > 0 && !_config.SupportedChainIds.Contains(payload.ChainId))
+        {
+            error = "Reward claim payload chain id is not supported by this deployment.";
+            return false;
+        }
+
+        var currentUnixTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        if (payload.Deadline <= currentUnixTime)
+        {
+            error = "Reward claim payload has expired.";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
     }
 }
