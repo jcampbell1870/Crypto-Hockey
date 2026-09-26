@@ -30,6 +30,16 @@ internal static class RewardSignatureHex
             return false;
         }
 
+        var v = Convert.ToByte(normalized[^2..], 16);
+        if (v is 0 or 1)
+        {
+            normalized = $"{normalized[..128]}{(v + 27):x2}";
+        }
+        else if (v is not 27 and not 28)
+        {
+            return false;
+        }
+
         normalizedSignatureHex = normalized;
         return true;
     }
