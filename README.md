@@ -194,6 +194,7 @@ docker run -e PORT=10000 -p 10000:10000 crypto-hockey
 
 On Render, create the web service from the repository blueprint or configure the service to use Docker so Render builds from the root `Dockerfile`.
 If an existing Render service is configured to use `.Dockerfile`, this repository also includes `.Dockerfile` for backward-compatible builds.
+The Render blueprint also declares required blockchain/database environment variable keys with `sync: false`, so values can be managed directly in the Render dashboard without being overwritten from source control.
 
 ## 🔧 Configuration
 
