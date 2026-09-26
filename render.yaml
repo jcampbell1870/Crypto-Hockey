@@ -12,3 +12,7 @@ services:
         value: "true"
       - key: BlockchainConfig__RewardIssuerUrl
         sync: false
+      - key: BlockchainConfig__RewardSignerPrivateKey
+        sync: false
+      - key: BlockchainConfig__RewardSignerAddress
+        sync: false

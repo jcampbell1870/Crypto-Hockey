@@ -1,0 +1,262 @@
+using System.Collections.Concurrent;
+using System.Numerics;
+using Crypto_Hockey.Models;
+using Microsoft.Extensions.Options;
+using Nethereum.ABI;
+using Nethereum.ABI.Model;
+using Nethereum.Hex.HexConvertors.Extensions;
+using Nethereum.Signer;
+using Nethereum.Util;
+
+namespace Crypto_Hockey.Services;
+
+public interface IRewardClaimIssuerService
+{
+    bool TryCreateClaim(RewardClaimIssueRequest request, out RewardClaimPayload? payload, out string? error);
+}
+
+public sealed class RewardClaimIssueRequest
+{
+    public string Recipient { get; set; } = string.Empty;
+    public RewardGameProof Game { get; set; } = new();
+}
+
+public class RewardClaimIssuerService : IRewardClaimIssuerService
+{
+    private static readonly byte[] Eip712DomainTypeHash =
+        new Sha3Keccack().CalculateHash(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
+        .HexToByteArray();
+
+    private static readonly byte[] ClaimTypeHash =
+        new Sha3Keccack().CalculateHash(
+            "Claim(address recipient,uint256 amount,uint256 nonce,uint256 deadline)")
+        .HexToByteArray();
+
+    private static readonly byte[] NameHash =
+        new Sha3Keccack().CalculateHash("Arcade1870RewardVault").HexToByteArray();
+
+    private static readonly byte[] VersionHash =
+        new Sha3Keccack().CalculateHash("1").HexToByteArray();
+
+    private readonly BlockchainConfig _config;
+    private readonly ILogger<RewardClaimIssuerService> _logger;
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _recentClaims = new();
+    private readonly ConcurrentDictionary<string, byte> _claimedGameIds = new();
+    private long _nonceCounter;
+
+    public RewardClaimIssuerService(
+        IOptions<BlockchainConfig> config,
+        ILogger<RewardClaimIssuerService> logger)
+    {
+        _config = config.Value;
+        _logger = logger;
+    }
+
+    public bool TryCreateClaim(RewardClaimIssueRequest request, out RewardClaimPayload? payload, out string? error)
+    {
+        payload = null;
+        error = null;
+
+        if (!IsValidAddress(request.Recipient))
+        {
+            error = "A valid recipient address is required.";
+            return false;
+        }
+
+        if (request.Game is null || string.IsNullOrWhiteSpace(request.Game.GameId))
+        {
+            error = "A completed game id is required.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(_config.RewardVaultAddress) || !IsValidAddress(_config.RewardVaultAddress))
+        {
+            error = "Reward vault is not configured.";
+            return false;
+        }
+
+        if (!TryParsePrivateKey(_config.RewardSignerPrivateKey, out var signerKey))
+        {
+            error = "Reward signer is not configured.";
+            return false;
+        }
+
+        if (!ValidateConfiguredSigner(signerKey, out error))
+        {
+            return false;
+        }
+
+        if (_config.DefaultNetworkChainId <= 0)
+        {
+            error = "Reward issuer chain id is invalid.";
+            return false;
+        }
+
+        if (!decimal.TryParse(_config.RewardAmount, out var rewardAmountDecimal) || rewardAmountDecimal <= 0)
+        {
+            error = "Reward amount configuration is invalid.";
+            return false;
+        }
+
+        if (_config.RewardTokenDecimals < 0)
+        {
+            error = "Reward token decimals configuration is invalid.";
+            return false;
+        }
+
+        var normalizedRecipient = request.Recipient.ToLowerInvariant();
+        var now = DateTimeOffset.UtcNow;
+        var minClaimInterval = TimeSpan.FromSeconds(Math.Max(0, _config.RewardMinClaimIntervalSeconds));
+        if (_recentClaims.TryGetValue(normalizedRecipient, out var lastClaimAt)
+            && now - lastClaimAt < minClaimInterval)
+        {
+            error = "Please wait before claiming another reward.";
+            return false;
+        }
+
+        var normalizedGameId = request.Game.GameId.Trim().ToLowerInvariant();
+        if (!_claimedGameIds.TryAdd(normalizedGameId, 1))
+        {
+            error = "This completed game has already been rewarded.";
+            return false;
+        }
+
+        try
+        {
+            var tokenUnitAmount = UnitConversion.Convert.ToWei(rewardAmountDecimal, _config.RewardTokenDecimals);
+            var nonce = (BigInteger)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1000
+                        + Interlocked.Increment(ref _nonceCounter);
+            var deadline = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + Math.Max(60, _config.RewardClaimTtlSeconds);
+            var signature = SignClaim(
+                signerKey,
+                request.Recipient,
+                tokenUnitAmount,
+                nonce,
+                new BigInteger(deadline),
+                _config.DefaultNetworkChainId,
+                _config.RewardVaultAddress);
+
+            payload = new RewardClaimPayload
+            {
+                Amount = tokenUnitAmount.ToString(),
+                Nonce = nonce.ToString(),
+                Deadline = deadline,
+                Signature = signature,
+                VaultAddress = _config.RewardVaultAddress,
+                ChainId = _config.DefaultNetworkChainId
+            };
+
+            _recentClaims[normalizedRecipient] = now;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Reward claim signing failed.");
+            _claimedGameIds.TryRemove(normalizedGameId, out _);
+            error = "EIP-712 reward signing failed. Verify reward signer key, chain id, and vault address.";
+            return false;
+        }
+    }
+
+    private bool ValidateConfiguredSigner(EthECKey signerKey, out string? error)
+    {
+        error = null;
+        if (string.IsNullOrWhiteSpace(_config.RewardSignerAddress))
+        {
+            return true;
+        }
+
+        if (!IsValidAddress(_config.RewardSignerAddress))
+        {
+            error = "Reward signer address configuration is invalid.";
+            return false;
+        }
+
+        if (!string.Equals(
+                signerKey.GetPublicAddress(),
+                _config.RewardSignerAddress,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            error = "Reward signer does not match configuration.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryParsePrivateKey(string value, out EthECKey signerKey)
+    {
+        signerKey = null!;
+        var normalized = value.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return false;
+        }
+
+        if (normalized.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized[2..];
+        }
+
+        try
+        {
+            signerKey = new EthECKey(normalized);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string SignClaim(
+        EthECKey signerKey,
+        string recipient,
+        BigInteger amount,
+        BigInteger nonce,
+        BigInteger deadline,
+        int chainId,
+        string rewardVaultAddress)
+    {
+        var abiEncode = new ABIEncode();
+
+        var domainSeparatorInput = abiEncode.GetABIEncoded(
+            new ABIValue("bytes32", Eip712DomainTypeHash),
+            new ABIValue("bytes32", NameHash),
+            new ABIValue("bytes32", VersionHash),
+            new ABIValue("uint256", new BigInteger(chainId)),
+            new ABIValue("address", rewardVaultAddress));
+
+        var domainSeparator = new Sha3Keccack().CalculateHash(domainSeparatorInput);
+
+        var claimInput = abiEncode.GetABIEncoded(
+            new ABIValue("bytes32", ClaimTypeHash),
+            new ABIValue("address", recipient),
+            new ABIValue("uint256", amount),
+            new ABIValue("uint256", nonce),
+            new ABIValue("uint256", deadline));
+
+        var structHash = new Sha3Keccack().CalculateHash(claimInput);
+
+        var digestInput = new byte[66];
+        digestInput[0] = 0x19;
+        digestInput[1] = 0x01;
+        Buffer.BlockCopy(domainSeparator, 0, digestInput, 2, 32);
+        Buffer.BlockCopy(structHash, 0, digestInput, 34, 32);
+        var digest = new Sha3Keccack().CalculateHash(digestInput);
+
+        var signature = signerKey.SignAndCalculateV(digest);
+        var signatureHex = EthECDSASignature.CreateStringSignature(signature);
+        return signatureHex.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+            ? signatureHex
+            : $"0x{signatureHex}";
+    }
+
+    private static bool IsValidAddress(string address)
+    {
+        return !string.IsNullOrWhiteSpace(address)
+               && address.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+               && address.Length == 42;
+    }
+}

@@ -31,6 +31,12 @@ public static class RewardIssuerEndpointResolver
             return false;
         }
 
+        if (string.IsNullOrWhiteSpace(issuerUri.Host))
+        {
+            validationError = $"Reward issuer URL must include a host: {configuredUrl}";
+            return false;
+        }
+
         var candidates = new List<Uri> { issuerUri };
         if (ShouldAppendRewardClaimPath(issuerUri))
         {
