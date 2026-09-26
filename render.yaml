@@ -10,3 +10,13 @@ services:
         value: cryptohockey.org;www.cryptohockey.org;crypto-hockey.onrender.com
       - key: TRUST_PROXY_HEADERS_FROM_RENDER
         value: "true"
+      - key: BlockchainConfig__Arcade1870ContractAddress
+        sync: false
+      - key: BlockchainConfig__RewardVaultAddress
+        sync: false
+      - key: BlockchainConfig__RewardIssuerUrl
+        sync: false
+      - key: BlockchainConfig__EthereumRpcUrl
+        sync: false
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
