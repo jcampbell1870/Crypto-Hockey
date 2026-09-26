@@ -3,6 +3,7 @@ using Crypto_Hockey.Data;
 using Crypto_Hockey.Models;
 using Crypto_Hockey.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -72,6 +73,51 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+app.MapGet(
+    "/health/reward-issuer",
+    async (IOptions<BlockchainConfig> blockchainOptions, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken) =>
+    {
+        var issuerUrl = blockchainOptions.Value.RewardIssuerUrl;
+        if (string.IsNullOrWhiteSpace(issuerUrl))
+        {
+            return Results.Problem(
+                title: "Reward issuer is not configured",
+                detail: "Set BlockchainConfig__RewardIssuerUrl to enable reward payouts.",
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+
+        if (!Uri.TryCreate(issuerUrl, UriKind.Absolute, out var issuerUri))
+        {
+            return Results.Problem(
+                title: "Reward issuer URL is invalid",
+                detail: $"Configured value '{issuerUrl}' is not a valid absolute URL.",
+                statusCode: StatusCodes.Status500InternalServerError);
+        }
+
+        try
+        {
+            var client = httpClientFactory.CreateClient();
+            using var request = new HttpRequestMessage(HttpMethod.Get, issuerUri);
+            using var response = await client.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
+
+            return Results.Json(new
+            {
+                status = response.IsSuccessStatusCode ? "healthy" : "degraded",
+                issuerUrl,
+                statusCode = (int)response.StatusCode
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.Problem(
+                title: "Reward issuer is unreachable",
+                detail: ex.Message,
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+    });
 
 using (var scope = app.Services.CreateScope())
 {
