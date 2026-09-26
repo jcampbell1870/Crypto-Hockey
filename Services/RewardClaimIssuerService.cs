@@ -41,7 +41,7 @@ public class RewardClaimIssuerService : IRewardClaimIssuerService
 
     private readonly BlockchainConfig _config;
     private readonly ILogger<RewardClaimIssuerService> _logger;
-    private readonly ConcurrentDictionary<string, IssuedRewardClaim> _issuedClaims = new();
+    private readonly ConcurrentDictionary<string, Lazy<IssuedRewardClaim>> _issuedClaims = new();
     private long _nonceCounter;
 
     public RewardClaimIssuerService(
@@ -110,52 +110,28 @@ public class RewardClaimIssuerService : IRewardClaimIssuerService
 
         CleanupExpiredClaims(now);
 
-        if (_issuedClaims.TryGetValue(normalizedGameId, out var existingClaim))
+        try
         {
-            if (!string.Equals(existingClaim.Recipient, normalizedRecipient, StringComparison.Ordinal))
+            var issuedClaim = GetOrCreateIssuedClaim(
+                normalizedGameId,
+                normalizedRecipient,
+                request.Recipient,
+                signerKey,
+                rewardAmountDecimal);
+
+            if (!string.Equals(issuedClaim.Recipient, normalizedRecipient, StringComparison.Ordinal))
             {
                 error = "This completed game has already been rewarded.";
                 return false;
             }
 
-            payload = ClonePayload(existingClaim.Payload);
-            return true;
-        }
-
-        try
-        {
-            var tokenUnitAmount = UnitConversion.Convert.ToWei(rewardAmountDecimal, _config.RewardTokenDecimals);
-            var nonce = (BigInteger)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1000
-                        + Interlocked.Increment(ref _nonceCounter);
-            var deadline = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + Math.Max(60, _config.RewardClaimTtlSeconds);
-            var signature = SignClaim(
-                signerKey,
-                request.Recipient,
-                tokenUnitAmount,
-                nonce,
-                new BigInteger(deadline),
-                _config.DefaultNetworkChainId,
-                _config.RewardVaultAddress);
-
-            payload = new RewardClaimPayload
-            {
-                Amount = tokenUnitAmount.ToString(),
-                Nonce = nonce.ToString(),
-                Deadline = deadline,
-                Signature = signature,
-                VaultAddress = _config.RewardVaultAddress,
-                ChainId = _config.DefaultNetworkChainId
-            };
-
-            _issuedClaims[normalizedGameId] = new IssuedRewardClaim(
-                normalizedRecipient,
-                ClonePayload(payload),
-                DateTimeOffset.FromUnixTimeSeconds(deadline));
+            payload = ClonePayload(issuedClaim.Payload);
             return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Reward claim signing failed.");
+            _issuedClaims.TryRemove(normalizedGameId, out _);
             error = "EIP-712 reward signing failed. Verify reward signer key, chain id, and vault address.";
             return false;
         }
@@ -165,11 +141,61 @@ public class RewardClaimIssuerService : IRewardClaimIssuerService
     {
         foreach (var issuedClaim in _issuedClaims)
         {
-            if (issuedClaim.Value.ExpiresAt <= now)
+            if (issuedClaim.Value.IsValueCreated
+                && issuedClaim.Value.Value.ExpiresAt <= now)
             {
                 _issuedClaims.TryRemove(issuedClaim.Key, out _);
             }
         }
+    }
+
+    private IssuedRewardClaim GetOrCreateIssuedClaim(
+        string normalizedGameId,
+        string normalizedRecipient,
+        string recipient,
+        EthECKey signerKey,
+        decimal rewardAmountDecimal)
+    {
+        var lazyClaim = _issuedClaims.GetOrAdd(
+            normalizedGameId,
+            _ => new Lazy<IssuedRewardClaim>(
+                () => CreateIssuedClaim(normalizedRecipient, recipient, signerKey, rewardAmountDecimal),
+                LazyThreadSafetyMode.ExecutionAndPublication));
+
+        return lazyClaim.Value;
+    }
+
+    private IssuedRewardClaim CreateIssuedClaim(
+        string normalizedRecipient,
+        string recipient,
+        EthECKey signerKey,
+        decimal rewardAmountDecimal)
+    {
+        var tokenUnitAmount = UnitConversion.Convert.ToWei(rewardAmountDecimal, _config.RewardTokenDecimals);
+        var nonce = (BigInteger)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1000
+                    + Interlocked.Increment(ref _nonceCounter);
+        var deadline = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + Math.Max(60, _config.RewardClaimTtlSeconds);
+        var signature = SignClaim(
+            signerKey,
+            recipient,
+            tokenUnitAmount,
+            nonce,
+            new BigInteger(deadline),
+            _config.DefaultNetworkChainId,
+            _config.RewardVaultAddress);
+
+        return new IssuedRewardClaim(
+            normalizedRecipient,
+            new RewardClaimPayload
+            {
+                Amount = tokenUnitAmount.ToString(),
+                Nonce = nonce.ToString(),
+                Deadline = deadline,
+                Signature = signature,
+                VaultAddress = _config.RewardVaultAddress,
+                ChainId = _config.DefaultNetworkChainId
+            },
+            DateTimeOffset.FromUnixTimeSeconds(deadline));
     }
 
     private bool ValidateConfiguredSigner(EthECKey signerKey, out string? error)
