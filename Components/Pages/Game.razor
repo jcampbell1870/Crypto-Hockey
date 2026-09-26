@@ -440,24 +440,24 @@
             rewardClaimInProgress = false;
             await InvokeAsync(StateHasChanged);
         }
+    }
 
-        private static string? BuildExplorerTransactionUrl(int chainId, string transactionHash)
+    private static string? BuildExplorerTransactionUrl(int chainId, string transactionHash)
+    {
+        if (string.IsNullOrWhiteSpace(transactionHash))
         {
-            if (string.IsNullOrWhiteSpace(transactionHash))
-            {
-                return null;
-            }
-
-            var baseUrl = chainId switch
-            {
-                1 => "https://etherscan.io/tx/",
-                11155111 => "https://sepolia.etherscan.io/tx/",
-                137 => "https://polygonscan.com/tx/",
-                _ => null
-            };
-
-            return baseUrl is null ? null : $"{baseUrl}{transactionHash}";
+            return null;
         }
+
+        var baseUrl = chainId switch
+        {
+            1 => "https://etherscan.io/tx/",
+            11155111 => "https://sepolia.etherscan.io/tx/",
+            137 => "https://polygonscan.com/tx/",
+            _ => null
+        };
+
+        return baseUrl is null ? null : $"{baseUrl}{transactionHash}";
     }
 
     async ValueTask IAsyncDisposable.DisposeAsync()
