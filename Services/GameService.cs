@@ -63,7 +63,9 @@ public class GameService : IGameService
         session.OpponentScore = opponentScore;
         session.PlayerWon = playerScore > opponentScore;
 
-        session.RewardAmount = ParseConfiguredRewardAmount();
+        session.RewardAmount = session.PlayerWon
+            ? ParseConfiguredRewardAmount()
+            : 0m;
 
         _context.GameSessions.Update(session);
         await _context.SaveChangesAsync();
@@ -138,6 +140,16 @@ public class GameService : IGameService
             || string.IsNullOrWhiteSpace(playerAddress)
             || !string.Equals(session.PlayerAddress, playerAddress, StringComparison.OrdinalIgnoreCase))
             return false;
+
+        if (!session.PlayerWon || session.RewardAmount <= 0)
+        {
+            _logger.LogInformation(
+                "Skipping reward claim for non-eligible session {SessionId}. PlayerWon={PlayerWon}, RewardAmount={RewardAmount}",
+                sessionId,
+                session.PlayerWon,
+                session.RewardAmount);
+            return false;
+        }
 
         var rewardClaim = await _blockchainService.RequestRewardClaimAsync(
             session.PlayerAddress,

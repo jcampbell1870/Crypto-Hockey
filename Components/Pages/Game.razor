@@ -71,7 +71,7 @@
                 <button class="btn btn-primary btn-block" @onclick="ResetGame">
                     Play Again
                 </button>
-               @if (!rewardClaimed && !rewardClaimInProgress)
+               @if (playerWon && !rewardClaimed && !rewardClaimInProgress)
                 {
                    <button class="btn btn-info btn-block mt-2" @onclick="RetryRewardClaim">
                        Retry Reward Payout
@@ -251,7 +251,14 @@
                     {
                         await GameService.EndGameSessionAsync(currentSessionId.Value, playerScore, opponentScore);
 
-                        await ClaimRewardAsync();
+                        if (playerWon)
+                        {
+                            await ClaimRewardAsync();
+                        }
+                        else
+                        {
+                            rewardStatusMessage = "No reward payout for this game result. Win to earn A1870 rewards.";
+                        }
                     }
 
                     await InvokeAsync(StateHasChanged);
