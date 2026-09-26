@@ -41,8 +41,7 @@ public class RewardClaimIssuerService : IRewardClaimIssuerService
 
     private readonly BlockchainConfig _config;
     private readonly ILogger<RewardClaimIssuerService> _logger;
-    private readonly ConcurrentDictionary<string, DateTimeOffset> _recentClaims = new();
-    private readonly ConcurrentDictionary<string, byte> _claimedGameIds = new();
+    private readonly ConcurrentDictionary<string, IssuedRewardClaim> _issuedClaims = new();
     private long _nonceCounter;
 
     public RewardClaimIssuerService(
@@ -106,20 +105,21 @@ public class RewardClaimIssuerService : IRewardClaimIssuerService
         }
 
         var normalizedRecipient = request.Recipient.ToLowerInvariant();
-        var now = DateTimeOffset.UtcNow;
-        var minClaimInterval = TimeSpan.FromSeconds(Math.Max(0, _config.RewardMinClaimIntervalSeconds));
-        if (_recentClaims.TryGetValue(normalizedRecipient, out var lastClaimAt)
-            && now - lastClaimAt < minClaimInterval)
-        {
-            error = "Please wait before claiming another reward.";
-            return false;
-        }
-
         var normalizedGameId = request.Game.GameId.Trim().ToLowerInvariant();
-        if (!_claimedGameIds.TryAdd(normalizedGameId, 1))
+        var now = DateTimeOffset.UtcNow;
+
+        CleanupExpiredClaims(now);
+
+        if (_issuedClaims.TryGetValue(normalizedGameId, out var existingClaim))
         {
-            error = "This completed game has already been rewarded.";
-            return false;
+            if (!string.Equals(existingClaim.Recipient, normalizedRecipient, StringComparison.Ordinal))
+            {
+                error = "This completed game has already been rewarded.";
+                return false;
+            }
+
+            payload = ClonePayload(existingClaim.Payload);
+            return true;
         }
 
         try
@@ -147,15 +147,28 @@ public class RewardClaimIssuerService : IRewardClaimIssuerService
                 ChainId = _config.DefaultNetworkChainId
             };
 
-            _recentClaims[normalizedRecipient] = now;
+            _issuedClaims[normalizedGameId] = new IssuedRewardClaim(
+                normalizedRecipient,
+                ClonePayload(payload),
+                DateTimeOffset.FromUnixTimeSeconds(deadline));
             return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Reward claim signing failed.");
-            _claimedGameIds.TryRemove(normalizedGameId, out _);
             error = "EIP-712 reward signing failed. Verify reward signer key, chain id, and vault address.";
             return false;
+        }
+    }
+
+    private void CleanupExpiredClaims(DateTimeOffset now)
+    {
+        foreach (var issuedClaim in _issuedClaims)
+        {
+            if (issuedClaim.Value.ExpiresAt <= now)
+            {
+                _issuedClaims.TryRemove(issuedClaim.Key, out _);
+            }
         }
     }
 
@@ -259,4 +272,22 @@ public class RewardClaimIssuerService : IRewardClaimIssuerService
                && address.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
                && address.Length == 42;
     }
+
+    private static RewardClaimPayload ClonePayload(RewardClaimPayload payload)
+    {
+        return new RewardClaimPayload
+        {
+            Amount = payload.Amount,
+            Nonce = payload.Nonce,
+            Deadline = payload.Deadline,
+            Signature = payload.Signature,
+            VaultAddress = payload.VaultAddress,
+            ChainId = payload.ChainId
+        };
+    }
+
+    private sealed record IssuedRewardClaim(
+        string Recipient,
+        RewardClaimPayload Payload,
+        DateTimeOffset ExpiresAt);
 }
