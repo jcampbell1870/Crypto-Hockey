@@ -108,7 +108,7 @@ public class RewardClaimIssuerService : IRewardClaimIssuerService
         var normalizedGameId = request.Game.GameId.Trim().ToLowerInvariant();
         var now = DateTimeOffset.UtcNow;
 
-        CleanupExpiredClaims(now);
+        TryRemoveExpiredClaim(normalizedGameId, now);
 
         try
         {
@@ -137,15 +137,13 @@ public class RewardClaimIssuerService : IRewardClaimIssuerService
         }
     }
 
-    private void CleanupExpiredClaims(DateTimeOffset now)
+    private void TryRemoveExpiredClaim(string normalizedGameId, DateTimeOffset now)
     {
-        foreach (var issuedClaim in _issuedClaims)
+        if (_issuedClaims.TryGetValue(normalizedGameId, out var issuedClaim)
+            && issuedClaim.IsValueCreated
+            && issuedClaim.Value.ExpiresAt <= now)
         {
-            if (issuedClaim.Value.IsValueCreated
-                && issuedClaim.Value.Value.ExpiresAt <= now)
-            {
-                _issuedClaims.TryRemove(issuedClaim.Key, out _);
-            }
+            _issuedClaims.TryRemove(normalizedGameId, out _);
         }
     }
 
