@@ -38,6 +38,7 @@ builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddScoped<IGameEngine, GameEngine>();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<IOnlineCompetitionService, OnlineCompetitionService>();
+builder.Services.AddSingleton<IRewardClaimIssuerService, RewardClaimIssuerService>();
 
 var app = builder.Build();
 
@@ -99,21 +100,43 @@ app.MapGet(
                 HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken);
 
-            return Results.Json(new
-            {
-                status = (int)response.StatusCode >= 500 ? "degraded" : "healthy",
-                issuerUrl = issuerUri.ToString(),
-                configuredIssuerUrl = issuerUrl,
-                statusCode = (int)response.StatusCode
-            });
-        }
-        catch (Exception ex)
-        {
-            return Results.Problem(
-                title: "Reward issuer is unreachable",
+           return Results.Json(new
+           {
+               status = (int)response.StatusCode >= 500 ? "degraded" : "healthy",
+               issuerUrl = issuerUri.ToString(),
+               configuredIssuerUrl = issuerUrl,
+               statusCode = (int)response.StatusCode
+           });
+       }
+       catch (Exception ex)
+       {
+           return Results.Problem(
+               title: "Reward issuer is unreachable",
                 detail: ex.Message,
                 statusCode: StatusCodes.Status503ServiceUnavailable);
         }
+    });
+app.MapPost(
+    "/api/reward-claim",
+    (RewardClaimIssueRequest request, IRewardClaimIssuerService rewardClaimIssuerService) =>
+    {
+        if (!rewardClaimIssuerService.TryCreateClaim(request, out var payload, out var error))
+        {
+            return Results.BadRequest(new { error });
+        }
+
+        return Results.Json(payload);
+    });
+app.MapPost(
+    "/reward-claim",
+    (RewardClaimIssueRequest request, IRewardClaimIssuerService rewardClaimIssuerService) =>
+    {
+        if (!rewardClaimIssuerService.TryCreateClaim(request, out var payload, out var error))
+        {
+            return Results.BadRequest(new { error });
+        }
+
+        return Results.Json(payload);
     });
 
 using (var scope = app.Services.CreateScope())

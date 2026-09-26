@@ -207,12 +207,16 @@ ASPNETCORE_ENVIRONMENT=Production
 AllowedHosts=cryptohockey.org;www.cryptohockey.org;crypto-hockey.onrender.com
 BlockchainConfig__Arcade1870ContractAddress=0x8eddD4edea39c5B5f77662453600F53A202EE47C
 BlockchainConfig__RewardVaultAddress=0x1e4f6e4a382adbdb662733a19ae773d3ab8f497d
-BlockchainConfig__RewardIssuerUrl=https://<your-reward-issuer-host>/api/reward-claim
+BlockchainConfig__RewardIssuerUrl=https://www.cryptohockey.org/api/reward-claim
+BlockchainConfig__RewardSignerPrivateKey=<dedicated-reward-signer-private-key>
+BlockchainConfig__RewardSignerAddress=<optional-expected-signer-address>
 BlockchainConfig__EthereumRpcUrl=https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
 ConnectionStrings__DefaultConnection=your_connection_string
 ```
 
-`BlockchainConfig__RewardIssuerUrl` must point to your live reward issuer endpoint. If it is missing or invalid, reward payouts will fail.
+`BlockchainConfig__RewardIssuerUrl` must point to your live reward issuer endpoint. This app now hosts that endpoint at `POST /api/reward-claim`, so production can use `https://www.cryptohockey.org/api/reward-claim` once signer variables are configured.
+`BlockchainConfig__RewardSignerPrivateKey` is required to issue EIP-712 signatures for vault claims. Use a dedicated signer wallet (never the vault owner key).
+`BlockchainConfig__RewardSignerAddress` is optional but recommended; when set, startup signing fails if the private key does not match the configured address.
 Use `/health/reward-issuer` to verify issuer configuration and reachability after deployment.
 
 Production defaults for the Cloudflare + Render deployment live in `appsettings.Production.json`, with `AllowedHosts` set to `cryptohockey.org`, `www.cryptohockey.org`, and `crypto-hockey.onrender.com` so MetaMask deep-link/browser flows can still reach the Render hostname.
