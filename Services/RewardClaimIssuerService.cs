@@ -285,22 +285,12 @@ public class RewardClaimIssuerService : IRewardClaimIssuerService
 
         var signature = signerKey.SignAndCalculateV(digest);
         var signatureHex = EthECDSASignature.CreateStringSignature(signature);
-        if (signatureHex.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
-        {
-            signatureHex = signatureHex[2..];
-        }
-
-        if (signatureHex.Length == 129)
-        {
-            signatureHex = $"{signatureHex[..128]}0{signatureHex[128]}";
-        }
-
-        if (signatureHex.Length != 130)
+        if (!RewardSignatureHex.TryNormalize(signatureHex, out var normalizedSignatureHex))
         {
             throw new InvalidOperationException("Generated reward signature has an invalid length.");
         }
 
-        return $"0x{signatureHex}";
+        return $"0x{normalizedSignatureHex}";
     }
 
     private static bool IsValidAddress(string address)
