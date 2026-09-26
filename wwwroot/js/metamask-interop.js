@@ -319,5 +319,68 @@ window.metamaskInterop = {
             console.error('Error sending transaction:', error);
             throw error;
         }
+    },
+
+    submitRewardClaim: async function (request) {
+        try {
+            if (!request || !request.vaultAddress || !request.data) {
+                throw new Error('Reward claim transaction data is incomplete.');
+            }
+
+            const provider = await this.waitForProvider();
+            if (!provider) {
+                throw new Error('MetaMask provider not found');
+            }
+
+            if (request.chainId > 0) {
+                const currentChainId = await provider.request({ method: 'eth_chainId' });
+                const currentChainIdNumber = parseInt(currentChainId, 16);
+
+                if (currentChainIdNumber !== request.chainId) {
+                    const switched = await this.switchNetwork(request.chainId);
+                    if (!switched) {
+                        throw new Error(`Please switch MetaMask to ${this.getChainName(request.chainId)} and try again.`);
+                    }
+                }
+            }
+
+            const accounts = await provider.request({
+                method: 'eth_requestAccounts'
+            });
+
+            if (!accounts || accounts.length === 0) {
+                throw new Error('No accounts found');
+            }
+
+            const txHash = await provider.request({
+                method: 'eth_sendTransaction',
+                params: [{
+                    from: accounts[0],
+                    to: request.vaultAddress,
+                    data: request.data
+                }],
+            });
+
+            return {
+                isSuccessful: true,
+                transactionHash: txHash,
+                errorMessage: null
+            };
+        } catch (error) {
+            console.error('Error submitting reward claim:', error);
+
+            let errorMessage = 'Reward transaction could not be submitted.';
+            if (error && error.code === 4001) {
+                errorMessage = 'Reward claim was cancelled in MetaMask.';
+            } else if (error && typeof error.message === 'string' && error.message.trim().length > 0) {
+                errorMessage = error.message;
+            }
+
+            return {
+                isSuccessful: false,
+                transactionHash: null,
+                errorMessage: errorMessage
+            };
+        }
     }
 };

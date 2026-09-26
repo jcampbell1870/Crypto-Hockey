@@ -9,6 +9,7 @@ public interface IWalletService
     Task<WalletConnectionState> GetWalletStateAsync();
     Task DisconnectWalletAsync();
     Task<bool> SwitchNetworkAsync(int chainId);
+    Task<WalletTransactionResult> SubmitRewardClaimAsync(RewardClaimTransactionRequest request);
 }
 
 public class WalletService : IWalletService
@@ -75,6 +76,23 @@ public class WalletService : IWalletService
         {
             Console.WriteLine($"Error switching network: {ex.Message}");
             return false;
+        }
+    }
+
+    public async Task<WalletTransactionResult> SubmitRewardClaimAsync(RewardClaimTransactionRequest request)
+    {
+        try
+        {
+            return await _jsRuntime.InvokeAsync<WalletTransactionResult>("window.metamaskInterop.submitRewardClaim", request);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error submitting reward claim transaction: {ex.Message}");
+            return new WalletTransactionResult
+            {
+                IsSuccessful = false,
+                ErrorMessage = ex.Message
+            };
         }
     }
 }
