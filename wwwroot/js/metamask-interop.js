@@ -412,6 +412,15 @@ window.metamaskInterop = {
             const estimatedFeeWei = estimatedGasWei * effectiveGasPriceWei;
             const estimatedFeeWithBufferWei = estimatedFeeWei + (estimatedFeeWei / 5n);
 
+            txParams.gas = `0x${estimatedGasWei.toString(16)}`;
+            if (baseFeeWei !== null) {
+                txParams.type = '0x2';
+                txParams.maxPriorityFeePerGas = `0x${priorityFeeWei.toString(16)}`;
+                txParams.maxFeePerGas = `0x${effectiveGasPriceWei.toString(16)}`;
+            } else {
+                txParams.gasPrice = `0x${effectiveGasPriceWei.toString(16)}`;
+            }
+
             if (availableBalanceWei < estimatedFeeWithBufferWei) {
                 const chainName = this.getChainName(request.chainId);
                 const nativeToken = this.getNativeTokenSymbol(request.chainId);
