@@ -4,7 +4,6 @@ using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 using Nethereum.ABI.FunctionEncoding;
 using Nethereum.ABI.Model;
-using Nethereum.Hex.HexConvertors.Extensions;
 using System.Numerics;
 
 namespace Crypto_Hockey.Services;
@@ -265,6 +264,11 @@ public class GameService : IGameService
             throw new InvalidOperationException("Reward claim deadline is invalid.");
         }
 
+        if (!RewardSignatureHex.TryParseBytes(payload.Signature, out var signatureBytes))
+        {
+            throw new InvalidOperationException("Reward claim signature is invalid.");
+        }
+
         var encoder = new FunctionCallEncoder();
         return encoder.EncodeRequest(
             "claim",
@@ -278,7 +282,7 @@ public class GameService : IGameService
                 amount,
                 nonce,
                 new BigInteger(payload.Deadline),
-                payload.Signature.HexToByteArray()
+                signatureBytes
             ]);
     }
 

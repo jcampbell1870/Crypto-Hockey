@@ -260,6 +260,12 @@ public class BlockchainService : IBlockchainService
             return false;
         }
 
+        if (!RewardSignatureHex.TryNormalize(payload.Signature, out _))
+        {
+            error = "Reward claim payload contains an invalid signature.";
+            return false;
+        }
+
         if (!decimal.TryParse(payload.Amount, out var amount) || amount <= 0)
         {
             error = "Reward claim payload contains an invalid amount.";
