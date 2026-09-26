@@ -48,6 +48,20 @@
             {
                <div class="alert @(rewardClaimed ? "alert-success" : "alert-info")" role="status" aria-live="polite">
                    @rewardStatusMessage
+                   @if (rewardClaimed && !string.IsNullOrWhiteSpace(rewardTransactionHash))
+                   {
+                       <div class="mt-2 small">
+                           Transaction:
+                           @if (!string.IsNullOrWhiteSpace(rewardExplorerUrl))
+                           {
+                               <a href="@rewardExplorerUrl" target="_blank" rel="noopener noreferrer">@rewardTransactionHash</a>
+                           }
+                           else
+                           {
+                               <code>@rewardTransactionHash</code>
+                           }
+                       </div>
+                   }
                </div>
             }
             <div class="form-group">
@@ -132,6 +146,8 @@
     private string? gameErrorMessage;
     private string? rewardStatusMessage;
     private string? rewardDiagnosticHint;
+    private string? rewardTransactionHash;
+    private string? rewardExplorerUrl;
 
     private CancellationTokenSource? gameLoopCts;
     private DateTime lastFrameTime = DateTime.UtcNow;
@@ -212,6 +228,8 @@
             playerScore = 0;
             opponentScore = 0;
             rewardStatusMessage = null;
+            rewardTransactionHash = null;
+            rewardExplorerUrl = null;
             lastFrameTime = DateTime.UtcNow;
 
             gameLoopCts = new CancellationTokenSource();
@@ -325,6 +343,8 @@
         gameErrorMessage = null;
         rewardStatusMessage = null;
         rewardDiagnosticHint = null;
+        rewardTransactionHash = null;
+        rewardExplorerUrl = null;
     }
 
     private Task RetryRewardClaim()
@@ -345,6 +365,8 @@
             gameErrorMessage = null;
             rewardDiagnosticHint = null;
             rewardStatusMessage = "Preparing your reward claim...";
+            rewardTransactionHash = null;
+            rewardExplorerUrl = null;
             await InvokeAsync(StateHasChanged);
 
             var preparedClaim = await GameService.PrepareRewardClaimAsync(currentSessionId.Value, currentWalletState.Address!);
@@ -370,8 +392,12 @@
                 if (completed)
                 {
                     rewardClaimed = true;
-                    rewardStatusMessage = $"Reward claim submitted. View transaction: {walletResult.TransactionHash}";
+                    rewardStatusMessage = "Reward claim submitted.";
                     rewardDiagnosticHint = null;
+                    rewardTransactionHash = walletResult.TransactionHash;
+                    rewardExplorerUrl = BuildExplorerTransactionUrl(
+                        preparedClaim.Transaction.ChainId,
+                        walletResult.TransactionHash);
 
                     if (currentWalletState.IsConnected)
                     {
@@ -396,6 +422,8 @@
                     ? "Reward payout could not be completed right now. You can retry below."
                     : walletResult.ErrorMessage;
                 rewardDiagnosticHint = null;
+                rewardTransactionHash = null;
+                rewardExplorerUrl = null;
             }
         }
         catch (Exception ex)
@@ -403,12 +431,32 @@
             rewardStatusMessage = null;
             gameErrorMessage = "Reward payout failed. Please try again shortly.";
             rewardDiagnosticHint = null;
+            rewardTransactionHash = null;
+            rewardExplorerUrl = null;
             Logger.LogError(ex, "Error claiming reward for session {SessionId}", currentSessionId);
         }
         finally
         {
             rewardClaimInProgress = false;
             await InvokeAsync(StateHasChanged);
+        }
+
+        private static string? BuildExplorerTransactionUrl(int chainId, string transactionHash)
+        {
+            if (string.IsNullOrWhiteSpace(transactionHash))
+            {
+                return null;
+            }
+
+            var baseUrl = chainId switch
+            {
+                1 => "https://etherscan.io/tx/",
+                11155111 => "https://sepolia.etherscan.io/tx/",
+                137 => "https://polygonscan.com/tx/",
+                _ => null
+            };
+
+            return baseUrl is null ? null : $"{baseUrl}{transactionHash}";
         }
     }
 
