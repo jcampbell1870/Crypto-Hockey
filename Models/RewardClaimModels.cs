@@ -49,5 +49,6 @@ public class WalletTransactionResult
 {
     public bool IsSuccessful { get; set; }
     public string? TransactionHash { get; set; }
+    public string? ErrorCode { get; set; }
     public string? ErrorMessage { get; set; }
 }

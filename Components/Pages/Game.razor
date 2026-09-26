@@ -435,9 +435,9 @@
                 var walletError = string.IsNullOrWhiteSpace(walletResult.ErrorMessage)
                     ? "Reward payout could not be completed right now. You can retry below."
                     : walletResult.ErrorMessage;
-                if (TryParseLowGasWarning(walletError, out var lowGasWarning))
+                if (string.Equals(walletResult.ErrorCode, "LOW_GAS", StringComparison.Ordinal))
                 {
-                    rewardWarningMessage = lowGasWarning;
+                    rewardWarningMessage = walletError;
                     gameErrorMessage = null;
                 }
                 else
@@ -483,24 +483,6 @@
         };
 
         return baseUrl is null ? null : $"{baseUrl}{transactionHash}";
-    }
-
-    private static bool TryParseLowGasWarning(string? errorMessage, out string? warning)
-    {
-        warning = null;
-        if (string.IsNullOrWhiteSpace(errorMessage))
-        {
-            return false;
-        }
-
-        const string marker = "[LOW_GAS]";
-        if (!errorMessage.StartsWith(marker, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        warning = errorMessage[marker.Length..].Trim();
-        return !string.IsNullOrWhiteSpace(warning);
     }
 
     async ValueTask IAsyncDisposable.DisposeAsync()

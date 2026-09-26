@@ -376,7 +376,7 @@ window.metamaskInterop = {
                 data: request.data
             };
 
-            const [estimatedGasHex, gasPriceHex, balanceHex] = await Promise.all([
+            const [estimatedGasHex, gasPriceHex, latestBlock, priorityFeeHex, balanceHex] = await Promise.all([
                 provider.request({
                     method: 'eth_estimateGas',
                     params: [txParams]
@@ -384,6 +384,13 @@ window.metamaskInterop = {
                 provider.request({
                     method: 'eth_gasPrice'
                 }),
+                provider.request({
+                    method: 'eth_getBlockByNumber',
+                    params: ['latest', false]
+                }),
+                provider.request({
+                    method: 'eth_maxPriorityFeePerGas'
+                }).catch(() => null),
                 provider.request({
                     method: 'eth_getBalance',
                     params: [accounts[0], 'latest']
@@ -393,7 +400,16 @@ window.metamaskInterop = {
             const estimatedGasWei = BigInt(estimatedGasHex);
             const gasPriceWei = BigInt(gasPriceHex);
             const availableBalanceWei = BigInt(balanceHex);
-            const estimatedFeeWei = estimatedGasWei * gasPriceWei;
+            const baseFeeWei = latestBlock && latestBlock.baseFeePerGas
+                ? BigInt(latestBlock.baseFeePerGas)
+                : null;
+            const priorityFeeWei = priorityFeeHex
+                ? BigInt(priorityFeeHex)
+                : (gasPriceWei > 0n ? gasPriceWei / 10n : 1500000000n);
+            const effectiveGasPriceWei = baseFeeWei === null
+                ? gasPriceWei
+                : (baseFeeWei * 2n) + priorityFeeWei;
+            const estimatedFeeWei = estimatedGasWei * effectiveGasPriceWei;
             const estimatedFeeWithBufferWei = estimatedFeeWei + (estimatedFeeWei / 5n);
 
             if (availableBalanceWei < estimatedFeeWithBufferWei) {
@@ -405,7 +421,8 @@ window.metamaskInterop = {
                 return {
                     isSuccessful: false,
                     transactionHash: null,
-                    errorMessage: `[LOW_GAS] Insufficient ${nativeToken} for gas on ${chainName}. Estimated needed: ~${required} ${nativeToken}; current wallet balance: ~${available} ${nativeToken}.`
+                    errorCode: 'LOW_GAS',
+                    errorMessage: `Insufficient ${nativeToken} for gas on ${chainName}. Estimated needed: ~${required} ${nativeToken}; current wallet balance: ~${available} ${nativeToken}.`
                 };
             }
 
@@ -417,13 +434,16 @@ window.metamaskInterop = {
             return {
                 isSuccessful: true,
                 transactionHash: txHash,
+                errorCode: null,
                 errorMessage: null
             };
         } catch (error) {
             console.error('Error submitting reward claim:', error);
 
+            let errorCode = null;
             let errorMessage = 'Reward transaction could not be submitted.';
             if (error && error.code === 4001) {
+                errorCode = 'USER_REJECTED';
                 errorMessage = 'Reward claim was cancelled in MetaMask.';
             } else if (error && typeof error.message === 'string' && error.message.trim().length > 0) {
                 errorMessage = error.message;
@@ -432,6 +452,7 @@ window.metamaskInterop = {
             return {
                 isSuccessful: false,
                 transactionHash: null,
+                errorCode: errorCode,
                 errorMessage: errorMessage
             };
         }
