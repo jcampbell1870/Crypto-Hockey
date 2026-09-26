@@ -27,3 +27,25 @@ public class RewardClaimResult
     public string? ErrorMessage { get; set; }
     public RewardClaimPayload? Payload { get; set; }
 }
+
+public class RewardClaimTransactionRequest
+{
+    public string VaultAddress { get; set; } = string.Empty;
+    public int ChainId { get; set; }
+    public string Data { get; set; } = string.Empty;
+}
+
+public class PreparedRewardClaimResult
+{
+    public bool IsSuccessful { get; set; }
+    public string? ErrorMessage { get; set; }
+    public RewardClaimPayload? Payload { get; set; }
+    public RewardClaimTransactionRequest? Transaction { get; set; }
+}
+
+public class WalletTransactionResult
+{
+    public bool IsSuccessful { get; set; }
+    public string? TransactionHash { get; set; }
+    public string? ErrorMessage { get; set; }
+}

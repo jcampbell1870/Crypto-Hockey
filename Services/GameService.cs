@@ -2,6 +2,10 @@ using Crypto_Hockey.Models;
 using Crypto_Hockey.Data;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
+using Nethereum.ABI.FunctionEncoding;
+using Nethereum.ABI.Model;
+using Nethereum.Hex.HexConvertors.Extensions;
+using System.Numerics;
 
 namespace Crypto_Hockey.Services;
 
@@ -12,7 +16,8 @@ public interface IGameService
     Task<PlayerProfile> GetOrCreatePlayerAsync(string walletAddress);
     Task<List<GameSession>> GetPlayerGameHistoryAsync(string walletAddress, int limit = 10);
     Task<List<PlayerProfile>> GetLeaderboardAsync(int limit = 10);
-    Task<bool> ClaimRewardAsync(int sessionId, string playerAddress);
+    Task<PreparedRewardClaimResult> PrepareRewardClaimAsync(int sessionId, string playerAddress);
+    Task<bool> CompleteRewardClaimAsync(int sessionId, string playerAddress, string transactionHash);
 }
 
 public class GameService : IGameService
@@ -130,14 +135,20 @@ public class GameService : IGameService
             .ToListAsync();
     }
 
-    public async Task<bool> ClaimRewardAsync(int sessionId, string playerAddress)
+    public async Task<PreparedRewardClaimResult> PrepareRewardClaimAsync(int sessionId, string playerAddress)
     {
         var session = await _context.GameSessions.FindAsync(sessionId);
         if (session == null
             || session.RewardClaimed
             || string.IsNullOrWhiteSpace(playerAddress)
             || !string.Equals(session.PlayerAddress, playerAddress, StringComparison.OrdinalIgnoreCase))
-            return false;
+        {
+            return new PreparedRewardClaimResult
+            {
+                IsSuccessful = false,
+                ErrorMessage = "This reward claim is no longer available."
+            };
+        }
 
         var rewardClaim = await _blockchainService.RequestRewardClaimAsync(
             session.PlayerAddress,
@@ -152,55 +163,122 @@ public class GameService : IGameService
                 PlayerWon = session.PlayerWon
             });
 
-        if (rewardClaim.IsSuccessful)
-        {
-            await using var transaction = await _context.Database.BeginTransactionAsync();
-            await _context.Entry(session).ReloadAsync();
-
-            if (session.RewardClaimed)
-            {
-                await transaction.CommitAsync();
-                return true;
-            }
-
-            session.RewardClaimed = true;
-            session.TransactionHash = !string.IsNullOrWhiteSpace(rewardClaim.Payload?.Nonce)
-                ? $"issuer-claim:{rewardClaim.Payload.Nonce}"
-                : session.TransactionHash;
-            var player = await _context.PlayerProfiles
-                .FirstOrDefaultAsync(p => p.WalletAddress == session.PlayerAddress);
-
-            if (player == null)
-            {
-                player = new PlayerProfile
-                {
-                    WalletAddress = session.PlayerAddress,
-                    CreatedAt = DateTime.UtcNow,
-                    LastPlayedAt = session.EndedAt,
-                    TotalGames = 0,
-                    TotalWins = 0,
-                    TotalLosses = 0,
-                    TotalRewardsEarned = 0
-                };
-
-                _context.PlayerProfiles.Add(player);
-            }
-
-            player.TotalRewardsEarned += session.RewardAmount;
-            _context.GameSessions.Update(session);
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
-            _logger.LogInformation("Reward claim package issued for session {SessionId}", sessionId);
-        }
-        else
+        if (!rewardClaim.IsSuccessful || rewardClaim.Payload == null)
         {
             _logger.LogWarning(
                 "Reward claim failed for session {SessionId}: {Reason}",
                 sessionId,
                 rewardClaim.ErrorMessage ?? "Unknown error");
+
+            return new PreparedRewardClaimResult
+            {
+                IsSuccessful = false,
+                ErrorMessage = rewardClaim.ErrorMessage ?? "Reward payout could not be prepared."
+            };
         }
 
-        return rewardClaim.IsSuccessful;
+        return new PreparedRewardClaimResult
+        {
+            IsSuccessful = true,
+            Payload = rewardClaim.Payload,
+            Transaction = new RewardClaimTransactionRequest
+            {
+                VaultAddress = rewardClaim.Payload.VaultAddress,
+                ChainId = rewardClaim.Payload.ChainId,
+                Data = BuildRewardClaimTransactionData(rewardClaim.Payload)
+            }
+        };
+    }
+
+    public async Task<bool> CompleteRewardClaimAsync(int sessionId, string playerAddress, string transactionHash)
+    {
+        if (string.IsNullOrWhiteSpace(transactionHash))
+        {
+            return false;
+        }
+
+        var session = await _context.GameSessions.FindAsync(sessionId);
+        if (session == null
+            || string.IsNullOrWhiteSpace(playerAddress)
+            || !string.Equals(session.PlayerAddress, playerAddress, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        await _context.Entry(session).ReloadAsync();
+
+        if (session.RewardClaimed)
+        {
+            await transaction.CommitAsync();
+            return true;
+        }
+
+        session.RewardClaimed = true;
+        session.TransactionHash = transactionHash;
+        var player = await _context.PlayerProfiles
+            .FirstOrDefaultAsync(p => p.WalletAddress == session.PlayerAddress);
+
+        if (player == null)
+        {
+            player = new PlayerProfile
+            {
+                WalletAddress = session.PlayerAddress,
+                CreatedAt = DateTime.UtcNow,
+                LastPlayedAt = session.EndedAt,
+                TotalGames = 0,
+                TotalWins = 0,
+                TotalLosses = 0,
+                TotalRewardsEarned = 0
+            };
+
+            _context.PlayerProfiles.Add(player);
+        }
+
+        player.TotalRewardsEarned += session.RewardAmount;
+        _context.GameSessions.Update(session);
+        await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+        _logger.LogInformation(
+            "Reward claim submitted on-chain for session {SessionId}: {TransactionHash}",
+            sessionId,
+            transactionHash);
+
+        return true;
+    }
+
+    private static string BuildRewardClaimTransactionData(RewardClaimPayload payload)
+    {
+        if (!BigInteger.TryParse(payload.Amount, out var amount) || amount <= 0)
+        {
+            throw new InvalidOperationException("Reward claim amount is invalid.");
+        }
+
+        if (!BigInteger.TryParse(payload.Nonce, out var nonce) || nonce < 0)
+        {
+            throw new InvalidOperationException("Reward claim nonce is invalid.");
+        }
+
+        if (payload.Deadline <= 0)
+        {
+            throw new InvalidOperationException("Reward claim deadline is invalid.");
+        }
+
+        var encoder = new FunctionCallEncoder();
+        return encoder.EncodeRequest(
+            "claim",
+            [
+                new Parameter("uint256", 1),
+                new Parameter("uint256", 2),
+                new Parameter("uint256", 3),
+                new Parameter("bytes", 4)
+            ],
+            [
+                amount,
+                nonce,
+                new BigInteger(payload.Deadline),
+                payload.Signature.HexToByteArray()
+            ]);
     }
 
     private decimal ParseConfiguredRewardAmount()

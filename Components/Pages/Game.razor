@@ -129,6 +129,7 @@
     private CancellationTokenSource? gameLoopCts;
     private DateTime lastFrameTime = DateTime.UtcNow;
     [Inject] IGameService GameService { get; set; } = null!;
+    [Inject] IWalletService WalletService { get; set; } = null!;
     [Inject] IJSRuntime JSRuntime { get; set; } = null!;
     [Inject] NavigationManager NavigationManager { get; set; } = null!;
     [Inject] ILogger<Game> Logger { get; set; } = null!;
@@ -333,24 +334,54 @@
         {
             rewardClaimInProgress = true;
             gameErrorMessage = null;
-            rewardStatusMessage = "Starting your reward payout...";
+            rewardStatusMessage = "Preparing your reward claim...";
             await InvokeAsync(StateHasChanged);
 
-            bool success = await GameService.ClaimRewardAsync(currentSessionId.Value, currentWalletState.Address!);
-            if (success)
+            var preparedClaim = await GameService.PrepareRewardClaimAsync(currentSessionId.Value, currentWalletState.Address!);
+            if (!preparedClaim.IsSuccessful || preparedClaim.Transaction is null)
             {
-                rewardClaimed = true;
-                rewardStatusMessage = "Reward payout started. Check your wallet shortly.";
+                rewardStatusMessage = null;
+                gameErrorMessage = preparedClaim.ErrorMessage ?? "Reward payout could not be prepared right now. You can retry below.";
+                return;
+            }
 
-                if (currentWalletState.IsConnected)
+            rewardStatusMessage = "Confirm the reward claim in MetaMask to receive your tokens.";
+            await InvokeAsync(StateHasChanged);
+
+            var walletResult = await WalletService.SubmitRewardClaimAsync(preparedClaim.Transaction);
+            if (walletResult.IsSuccessful && !string.IsNullOrWhiteSpace(walletResult.TransactionHash))
+            {
+                var completed = await GameService.CompleteRewardClaimAsync(
+                    currentSessionId.Value,
+                    currentWalletState.Address!,
+                    walletResult.TransactionHash);
+
+                if (completed)
                 {
-                    playerProfile = await GameService.GetOrCreatePlayerAsync(currentWalletState.Address!);
+                    rewardClaimed = true;
+                    rewardStatusMessage = $"Reward claim submitted. View transaction: {walletResult.TransactionHash}";
+
+                    if (currentWalletState.IsConnected)
+                    {
+                        playerProfile = await GameService.GetOrCreatePlayerAsync(currentWalletState.Address!);
+                    }
+                }
+                else
+                {
+                    rewardStatusMessage = null;
+                    gameErrorMessage = "Reward transaction was submitted, but the game could not record it. Please contact support with the transaction hash.";
+                    Logger.LogError(
+                        "Reward claim transaction {TransactionHash} submitted for session {SessionId} but completion could not be recorded.",
+                        walletResult.TransactionHash,
+                        currentSessionId);
                 }
             }
             else
             {
                 rewardStatusMessage = null;
-                gameErrorMessage = "Reward payout could not be completed right now. You can retry below.";
+                gameErrorMessage = string.IsNullOrWhiteSpace(walletResult.ErrorMessage)
+                    ? "Reward payout could not be completed right now. You can retry below."
+                    : walletResult.ErrorMessage;
             }
         }
         catch (Exception ex)
