@@ -410,7 +410,6 @@ window.metamaskInterop = {
                 ? gasPriceWei
                 : (baseFeeWei * 2n) + priorityFeeWei;
             const estimatedFeeWei = estimatedGasWei * effectiveGasPriceWei;
-            const estimatedFeeWithBufferWei = estimatedFeeWei + (estimatedFeeWei / 5n);
 
             txParams.gas = `0x${estimatedGasWei.toString(16)}`;
             if (baseFeeWei !== null) {
@@ -421,10 +420,10 @@ window.metamaskInterop = {
                 txParams.gasPrice = `0x${effectiveGasPriceWei.toString(16)}`;
             }
 
-            if (availableBalanceWei < estimatedFeeWithBufferWei) {
+            if (availableBalanceWei < estimatedFeeWei) {
                 const chainName = this.getChainName(request.chainId);
                 const nativeToken = this.getNativeTokenSymbol(request.chainId);
-                const required = this.formatWeiToNative(estimatedFeeWithBufferWei);
+                const required = this.formatWeiToNative(estimatedFeeWei);
                 const available = this.formatWeiToNative(availableBalanceWei);
 
                 return {
