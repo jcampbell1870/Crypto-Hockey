@@ -173,7 +173,8 @@ public class GameService : IGameService
             return new PreparedRewardClaimResult
             {
                 IsSuccessful = false,
-                ErrorMessage = rewardClaim.ErrorMessage ?? "Reward payout could not be prepared."
+                ErrorMessage = rewardClaim.ErrorMessage ?? "Reward payout could not be prepared.",
+                DiagnosticHint = rewardClaim.DiagnosticHint
             };
         }
 

@@ -87,11 +87,13 @@ public class BlockchainService : IBlockchainService
                 return new RewardClaimResult
                 {
                     IsSuccessful = false,
-                    ErrorMessage = "Reward issuer configuration is invalid. Please contact support."
+                    ErrorMessage = "Reward issuer configuration is invalid. Please contact support.",
+                    DiagnosticHint = $"Configured issuer URL: {_config.RewardIssuerUrl}"
                 };
             }
 
             var client = _httpClientFactory.CreateClient();
+            var resolvedIssuerEndpoints = string.Join(", ", rewardIssuerUris.Select(uri => uri.ToString()));
             var claimRequest = new
             {
                 recipient = walletAddress,
@@ -137,7 +139,8 @@ public class BlockchainService : IBlockchainService
                         IsSuccessful = false,
                         ErrorMessage = string.IsNullOrWhiteSpace(rawError)
                             ? $"Issuer error {(int)response.StatusCode}."
-                            : rawError
+                            : rawError,
+                        DiagnosticHint = $"Resolved issuer endpoint(s): {resolvedIssuerEndpoints}. Last attempted: {rewardIssuerUri}"
                     };
                 }
 
@@ -147,7 +150,8 @@ public class BlockchainService : IBlockchainService
                     return new RewardClaimResult
                     {
                         IsSuccessful = false,
-                        ErrorMessage = "Reward issuer response was empty."
+                        ErrorMessage = "Reward issuer response was empty.",
+                        DiagnosticHint = $"Resolved issuer endpoint(s): {resolvedIssuerEndpoints}. Last attempted: {rewardIssuerUri}"
                     };
                 }
 
@@ -161,7 +165,8 @@ public class BlockchainService : IBlockchainService
                     return new RewardClaimResult
                     {
                         IsSuccessful = false,
-                        ErrorMessage = validationError
+                        ErrorMessage = validationError,
+                        DiagnosticHint = $"Resolved issuer endpoint(s): {resolvedIssuerEndpoints}. Last attempted: {rewardIssuerUri}"
                     };
                 }
 
@@ -175,7 +180,8 @@ public class BlockchainService : IBlockchainService
             return new RewardClaimResult
             {
                 IsSuccessful = false,
-                ErrorMessage = "Reward issuer did not provide a valid claim endpoint."
+                ErrorMessage = "Reward issuer did not provide a valid claim endpoint.",
+                DiagnosticHint = $"Resolved issuer endpoint(s): {resolvedIssuerEndpoints}"
             };
         }
         catch (Exception ex)
@@ -184,7 +190,8 @@ public class BlockchainService : IBlockchainService
             return new RewardClaimResult
             {
                 IsSuccessful = false,
-                ErrorMessage = ex.Message
+                ErrorMessage = ex.Message,
+                DiagnosticHint = $"Configured issuer URL: {_config.RewardIssuerUrl}"
             };
         }
     }

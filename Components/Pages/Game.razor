@@ -36,6 +36,12 @@
             {
                 <div class="alert alert-danger" role="alert">
                     @gameErrorMessage
+                    @if (!string.IsNullOrWhiteSpace(rewardDiagnosticHint))
+                    {
+                        <div class="mt-2 small">
+                            <strong>Debug hint:</strong> @rewardDiagnosticHint
+                        </div>
+                    }
                 </div>
             }
             @if (!string.IsNullOrWhiteSpace(rewardStatusMessage))
@@ -125,6 +131,7 @@
     private int? currentSessionId;
     private string? gameErrorMessage;
     private string? rewardStatusMessage;
+    private string? rewardDiagnosticHint;
 
     private CancellationTokenSource? gameLoopCts;
     private DateTime lastFrameTime = DateTime.UtcNow;
@@ -187,6 +194,7 @@
         try
         {
             gameErrorMessage = null;
+            rewardDiagnosticHint = null;
 
             // Get or create player profile
             playerProfile = await GameService.GetOrCreatePlayerAsync(currentWalletState.Address);
@@ -316,6 +324,7 @@
         currentSessionId = null;
         gameErrorMessage = null;
         rewardStatusMessage = null;
+        rewardDiagnosticHint = null;
     }
 
     private Task RetryRewardClaim()
@@ -334,6 +343,7 @@
         {
             rewardClaimInProgress = true;
             gameErrorMessage = null;
+            rewardDiagnosticHint = null;
             rewardStatusMessage = "Preparing your reward claim...";
             await InvokeAsync(StateHasChanged);
 
@@ -342,6 +352,7 @@
             {
                 rewardStatusMessage = null;
                 gameErrorMessage = preparedClaim.ErrorMessage ?? "Reward payout could not be prepared right now. You can retry below.";
+                rewardDiagnosticHint = preparedClaim.DiagnosticHint;
                 return;
             }
 
@@ -360,6 +371,7 @@
                 {
                     rewardClaimed = true;
                     rewardStatusMessage = $"Reward claim submitted. View transaction: {walletResult.TransactionHash}";
+                    rewardDiagnosticHint = null;
 
                     if (currentWalletState.IsConnected)
                     {
@@ -370,6 +382,7 @@
                 {
                     rewardStatusMessage = null;
                     gameErrorMessage = "Reward transaction was submitted, but the game could not record it. Please contact support with the transaction hash.";
+                    rewardDiagnosticHint = null;
                     Logger.LogError(
                         "Reward claim transaction {TransactionHash} submitted for session {SessionId} but completion could not be recorded.",
                         walletResult.TransactionHash,
@@ -382,12 +395,14 @@
                 gameErrorMessage = string.IsNullOrWhiteSpace(walletResult.ErrorMessage)
                     ? "Reward payout could not be completed right now. You can retry below."
                     : walletResult.ErrorMessage;
+                rewardDiagnosticHint = null;
             }
         }
         catch (Exception ex)
         {
             rewardStatusMessage = null;
             gameErrorMessage = "Reward payout failed. Please try again shortly.";
+            rewardDiagnosticHint = null;
             Logger.LogError(ex, "Error claiming reward for session {SessionId}", currentSessionId);
         }
         finally
