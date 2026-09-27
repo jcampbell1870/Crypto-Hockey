@@ -311,7 +311,7 @@
     [JSInvokable]
     public async Task OnGameCompleted(int finalPlayerScore, int finalOpponentScore, int gameToken)
     {
-        if (gameToken != activeGameToken || !gameRunning)
+        if (gameToken != activeGameToken)
         {
             return;
         }
