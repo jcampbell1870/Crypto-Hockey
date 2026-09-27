@@ -339,6 +339,57 @@ window.metamaskInterop = {
         }
     },
 
+    ensureRewardTokenVisible: async function (provider, request) {
+        if (!provider
+            || !request
+            || !request.tokenAddress
+            || !request.tokenSymbol
+            || !Number.isInteger(request.tokenDecimals)
+            || request.tokenDecimals < 0) {
+            return false;
+        }
+
+        try {
+            return await provider.request({
+                method: 'wallet_watchAsset',
+                params: {
+                    type: 'ERC20',
+                    options: {
+                        address: request.tokenAddress,
+                        symbol: request.tokenSymbol,
+                        decimals: request.tokenDecimals
+                    }
+                }
+            });
+        } catch (error) {
+            console.warn('Unable to add Arcade1870 token to MetaMask asset list:', error);
+            return false;
+        }
+    },
+
+    waitForTransactionReceipt: async function (provider, transactionHash, maxAttempts = 30, delayMs = 2000) {
+        if (!provider || !transactionHash) {
+            return null;
+        }
+
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            const receipt = await provider.request({
+                method: 'eth_getTransactionReceipt',
+                params: [transactionHash]
+            });
+
+            if (receipt) {
+                return receipt;
+            }
+
+            if (attempt < maxAttempts - 1) {
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
+        }
+
+        return null;
+    },
+
     submitRewardClaim: async function (request) {
         try {
             if (!request || !request.vaultAddress || !request.data) {
@@ -438,6 +489,19 @@ window.metamaskInterop = {
                 method: 'eth_sendTransaction',
                 params: [txParams],
             });
+
+            this.waitForTransactionReceipt(provider, txHash)
+                .then(async receipt => {
+                    const status = receipt?.status;
+                    const transactionSucceeded = status === true || status === '0x1' || status === '0x01';
+
+                    if (transactionSucceeded) {
+                        await this.ensureRewardTokenVisible(provider, request);
+                    }
+                })
+                .catch(error => {
+                    console.warn('Unable to confirm reward claim transaction for token visibility prompt:', error);
+                });
 
             return {
                 isSuccessful: true,
