@@ -31,22 +31,26 @@ public class GameEngine : IGameEngine
     private const float PaddleWidth = 10f;
     private const float PaddleHeight = 80f;
     private const float PaddleSpeed = 300f;
-    private const float InitialPuckSpeed = 200f;
-    private const float MaxPuckSpeed = 500f;
+    private const float BaseInitialPuckSpeed = 280f;
+    private const float BaseMaxPuckSpeed = 750f;
 
     private GameState _state = new();
     private string _difficultyLevel = "Medium";
     private float _aiReactionTime = 0f;
+    private float _currentInitialPuckSpeed = BaseInitialPuckSpeed;
+    private float _currentMaxPuckSpeed = BaseMaxPuckSpeed;
 
     public void InitializeGame(string difficultyLevel)
     {
         _difficultyLevel = difficultyLevel;
+        _currentInitialPuckSpeed = GetInitialPuckSpeed(difficultyLevel);
+        _currentMaxPuckSpeed = GetMaxPuckSpeed(difficultyLevel);
         _state = new GameState
         {
             PuckX = CanvasWidth / 2,
             PuckY = CanvasHeight / 2,
-            PuckVelocityX = InitialPuckSpeed,
-            PuckVelocityY = InitialPuckSpeed * 0.5f,
+            PuckVelocityX = _currentInitialPuckSpeed,
+            PuckVelocityY = _currentInitialPuckSpeed * 0.5f,
             PlayerPaddleY = CanvasHeight / 2 - PaddleHeight / 2,
             OpponentPaddleY = CanvasHeight / 2 - PaddleHeight / 2,
             PlayerScore = 0,
@@ -189,9 +193,9 @@ public class GameEngine : IGameEngine
     private void IncreasePuckSpeed()
     {
         float speed = (float)Math.Sqrt(_state.PuckVelocityX * _state.PuckVelocityX + _state.PuckVelocityY * _state.PuckVelocityY);
-        if (speed < MaxPuckSpeed)
+        if (speed < _currentMaxPuckSpeed)
         {
-            speed = Math.Min(speed * 1.05f, MaxPuckSpeed);
+            speed = Math.Min(speed * GetPuckSpeedGrowth(), _currentMaxPuckSpeed);
             float angle = (float)Math.Atan2(_state.PuckVelocityY, _state.PuckVelocityX);
             _state.PuckVelocityX = (float)Math.Cos(angle) * speed;
             _state.PuckVelocityY = (float)Math.Sin(angle) * speed;
@@ -202,7 +206,40 @@ public class GameEngine : IGameEngine
     {
         _state.PuckX = CanvasWidth / 2;
         _state.PuckY = CanvasHeight / 2;
-        _state.PuckVelocityX = (Random.Shared.Next(0, 2) == 0 ? 1 : -1) * InitialPuckSpeed;
-        _state.PuckVelocityY = (Random.Shared.Next(-1, 2) * InitialPuckSpeed * 0.25f);
+        _state.PuckVelocityX = (Random.Shared.Next(0, 2) == 0 ? 1 : -1) * _currentInitialPuckSpeed;
+        _state.PuckVelocityY = (Random.Shared.Next(-1, 2) * _currentInitialPuckSpeed * 0.25f);
+    }
+
+    private static float GetInitialPuckSpeed(string difficultyLevel)
+    {
+        return difficultyLevel switch
+        {
+            "Easy" => BaseInitialPuckSpeed * 0.85f,
+            "Medium" => BaseInitialPuckSpeed,
+            "Hard" => BaseInitialPuckSpeed * 1.15f,
+            _ => BaseInitialPuckSpeed
+        };
+    }
+
+    private static float GetMaxPuckSpeed(string difficultyLevel)
+    {
+        return difficultyLevel switch
+        {
+            "Easy" => BaseMaxPuckSpeed * 0.9f,
+            "Medium" => BaseMaxPuckSpeed,
+            "Hard" => BaseMaxPuckSpeed * 1.15f,
+            _ => BaseMaxPuckSpeed
+        };
+    }
+
+    private float GetPuckSpeedGrowth()
+    {
+        return _difficultyLevel switch
+        {
+            "Easy" => 1.04f,
+            "Medium" => 1.07f,
+            "Hard" => 1.1f,
+            _ => 1.07f
+        };
     }
 }
