@@ -367,6 +367,27 @@ window.metamaskInterop = {
         }
     },
 
+    waitForTransactionReceipt: async function (provider, transactionHash, maxAttempts = 30, delayMs = 2000) {
+        if (!provider || !transactionHash) {
+            return null;
+        }
+
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            const receipt = await provider.request({
+                method: 'eth_getTransactionReceipt',
+                params: [transactionHash]
+            });
+
+            if (receipt) {
+                return receipt;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+
+        return null;
+    },
+
     submitRewardClaim: async function (request) {
         try {
             if (!request || !request.vaultAddress || !request.data) {
@@ -467,7 +488,13 @@ window.metamaskInterop = {
                 params: [txParams],
             });
 
-            await this.ensureRewardTokenVisible(provider, request);
+            const receipt = await this.waitForTransactionReceipt(provider, txHash);
+            const status = receipt?.status;
+            const transactionSucceeded = status === true || status === '0x1' || status === '0x01';
+
+            if (transactionSucceeded) {
+                await this.ensureRewardTokenVisible(provider, request);
+            }
 
             return {
                 isSuccessful: true,
