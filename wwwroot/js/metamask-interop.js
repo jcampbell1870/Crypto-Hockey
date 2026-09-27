@@ -382,7 +382,9 @@ window.metamaskInterop = {
                 return receipt;
             }
 
-            await new Promise(resolve => setTimeout(resolve, delayMs));
+            if (attempt < maxAttempts - 1) {
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
         }
 
         return null;
