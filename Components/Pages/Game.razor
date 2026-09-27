@@ -82,7 +82,7 @@
             @if (!gameRunning && !gameOver)
             {
                 <button class="btn btn-success btn-block" @onclick="StartGame" disabled="@(!currentWalletState.IsConnected)">
-                    Start Game
+                    @(gamePaused ? "Resume Game" : "Start Game")
                 </button>
             }
             else if (gameRunning)
@@ -138,6 +138,7 @@
     private PlayerProfile? playerProfile;
 
     private bool gameRunning = false;
+    private bool gamePaused = false;
     private bool gameOver = false;
     private bool playerWon = false;
     private bool rewardClaimed = false;
@@ -155,6 +156,7 @@
 
     private DotNetObjectReference<Game>? gameCallbacksRef;
     private int activeGameToken;
+    private bool gameCompletionInProgress;
     [Inject] IGameService GameService { get; set; } = null!;
     [Inject] IWalletService WalletService { get; set; } = null!;
     [Inject] IJSRuntime JSRuntime { get; set; } = null!;
@@ -201,7 +203,23 @@
     private async Task StartGame()
     {
         if (!currentWalletState.IsConnected || string.IsNullOrEmpty(currentWalletState.Address))
+        {
             return;
+        }
+
+        if (gameRunning)
+        {
+            return;
+        }
+
+        if (gamePaused && currentSessionId.HasValue)
+        {
+            gameRunning = true;
+            gamePaused = false;
+            await JSRuntime.InvokeVoidAsync("window.gameRenderer.resumeGame", canvasRef);
+            StateHasChanged();
+            return;
+        }
 
         try
         {
@@ -218,6 +236,7 @@
 
             activeGameToken++;
             gameRunning = true;
+            gamePaused = false;
             gameOver = false;
             playerWon = false;
             rewardClaimed = false;
@@ -249,6 +268,7 @@
     private async Task PauseGame()
     {
         gameRunning = false;
+        gamePaused = true;
         await JSRuntime.InvokeVoidAsync("window.gameRenderer.pauseGame", canvasRef);
         StateHasChanged();
     }
@@ -257,6 +277,8 @@
     {
         await JSRuntime.InvokeVoidAsync("window.gameRenderer.resetGame", canvasRef);
         gameOver = false;
+        gamePaused = false;
+        gameRunning = false;
         playerWon = false;
         rewardClaimed = false;
         rewardClaimInProgress = false;
@@ -294,18 +316,37 @@
             return;
         }
 
+        if (gameCompletionInProgress)
+        {
+            return;
+        }
+
         gameRunning = false;
+        gamePaused = false;
         gameOver = true;
         playerScore = finalPlayerScore;
         opponentScore = finalOpponentScore;
         playerWon = playerScore > opponentScore;
+        gameCompletionInProgress = true;
 
-        if (currentSessionId.HasValue)
+        try
         {
-            var completedSessionId = currentSessionId.Value;
-            currentSessionId = null;
-            await GameService.EndGameSessionAsync(completedSessionId, playerScore, opponentScore);
-            await ClaimRewardAsync();
+            if (currentSessionId.HasValue)
+            {
+                var completedSessionId = currentSessionId.Value;
+                await GameService.EndGameSessionAsync(completedSessionId, playerScore, opponentScore);
+                await ClaimRewardAsync();
+                currentSessionId = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            gameErrorMessage = "We couldn't finalize this game session. Please try another match in a moment.";
+            Logger.LogError(ex, "Error finalizing game completion for session {SessionId}", currentSessionId);
+        }
+        finally
+        {
+            gameCompletionInProgress = false;
         }
 
         await InvokeAsync(StateHasChanged);

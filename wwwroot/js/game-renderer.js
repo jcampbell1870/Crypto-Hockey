@@ -223,13 +223,23 @@
         clientState.lastReportedOpponentScore = state.opponentScore;
 
         if (clientState.dotNetRef) {
-            clientState.dotNetRef.invokeMethodAsync(
+            handleInteropPromise(clientState.dotNetRef.invokeMethodAsync(
                 'OnGameScoreChanged',
                 state.playerScore,
                 state.opponentScore,
                 clientState.gameToken
-            );
+            ));
         }
+    }
+
+    function handleInteropPromise(promise) {
+        if (!promise || typeof promise.catch !== 'function') {
+            return;
+        }
+
+        promise.catch((error) => {
+            console.warn('Game interop callback failed.', error);
+        });
     }
 
     function gameLoop(canvas, clientState, timestamp) {
@@ -250,12 +260,12 @@
 
         if (gameOver) {
             if (clientState.dotNetRef) {
-                clientState.dotNetRef.invokeMethodAsync(
+                handleInteropPromise(clientState.dotNetRef.invokeMethodAsync(
                     'OnGameCompleted',
                     clientState.state.playerScore,
                     clientState.state.opponentScore,
                     clientState.gameToken
-                );
+                ));
             }
             return;
         }
@@ -265,7 +275,7 @@
         );
     }
 
-    function bindInputHandlers(canvas, clientState) {
+    function bindInputHandlers(canvas) {
         const existing = canvasListeners.get(canvas);
         if (existing) {
             return existing;
@@ -278,7 +288,12 @@
             }
 
             const normalizedY = ((clientY - rect.top) / rect.height) * canvas.height;
-            clientState.playerInputY = normalizedY - PADDLE_HEIGHT / 2;
+            const currentState = canvasStates.get(canvas);
+            if (!currentState) {
+                return;
+            }
+
+            currentState.playerInputY = normalizedY - PADDLE_HEIGHT / 2;
         };
 
         const mouseMoveHandler = (event) => movePaddleFromPointer(event.clientY);
@@ -347,7 +362,7 @@
             };
 
             canvasStates.set(canvasElement, clientState);
-            bindInputHandlers(canvasElement, clientState);
+            bindInputHandlers(canvasElement);
 
             render(canvasElement, state);
             notifyScoreIfChanged(clientState);
@@ -366,6 +381,22 @@
             }
 
             stopLoop(clientState);
+        },
+        resumeGame: function (canvasElement) {
+            if (!canvasElement) {
+                return;
+            }
+
+            const clientState = canvasStates.get(canvasElement);
+            if (!clientState || clientState.running) {
+                return;
+            }
+
+            clientState.running = true;
+            clientState.lastFrameTime = 0;
+            clientState.animationFrameId = window.requestAnimationFrame((timestamp) =>
+                gameLoop(canvasElement, clientState, timestamp)
+            );
         },
         resetGame: function (canvasElement) {
             if (!canvasElement) {
