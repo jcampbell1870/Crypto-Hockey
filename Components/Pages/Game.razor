@@ -257,7 +257,9 @@
         catch (Exception ex)
         {
             gameRunning = false;
+            gamePaused = false;
             currentSessionId = null;
+            activeGameToken++;
             gameErrorMessage = "Unable to start the game right now. Please try again in a moment.";
             Logger.LogError(ex, "Error starting game for wallet {WalletAddress}", currentWalletState.Address);
         }
@@ -347,6 +349,7 @@
         finally
         {
             gameCompletionInProgress = false;
+            activeGameToken++;
         }
 
         await InvokeAsync(StateHasChanged);
