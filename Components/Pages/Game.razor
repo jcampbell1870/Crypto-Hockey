@@ -82,7 +82,7 @@
             @if (!gameRunning && !gameOver)
             {
                 <button class="btn btn-success btn-block" @onclick="StartGame" disabled="@(!currentWalletState.IsConnected)">
-                    Start Game
+                    @(gamePaused ? "Resume Game" : "Start Game")
                 </button>
             }
             else if (gameRunning)
@@ -125,9 +125,7 @@
         <canvas @ref="canvasRef" 
                 width="800" 
                 height="400" 
-                class="game-canvas"
-                @onmousemove="OnMouseMove"
-                @ontouchmove="OnTouchMove">
+                class="game-canvas">
         </canvas>
 
     </div>
@@ -136,11 +134,11 @@
 @code {
     private ElementReference canvasRef;
     private WalletConnection? walletComponent;
-    private IGameEngine gameEngine = null!;
     private WalletConnectionState currentWalletState = new();
     private PlayerProfile? playerProfile;
 
     private bool gameRunning = false;
+    private bool gamePaused = false;
     private bool gameOver = false;
     private bool playerWon = false;
     private bool rewardClaimed = false;
@@ -156,8 +154,9 @@
     private string? rewardTransactionHash;
     private string? rewardExplorerUrl;
 
-    private CancellationTokenSource? gameLoopCts;
-    private DateTime lastFrameTime = DateTime.UtcNow;
+    private DotNetObjectReference<Game>? gameCallbacksRef;
+    private int activeGameToken;
+    private int gameCompletionInProgressFlag;
     [Inject] IGameService GameService { get; set; } = null!;
     [Inject] IWalletService WalletService { get; set; } = null!;
     [Inject] IJSRuntime JSRuntime { get; set; } = null!;
@@ -188,23 +187,15 @@
         }
     }
 
-    protected override async Task OnInitializedAsync()
-    {
-        gameEngine = new GameEngine();
-    }
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
+            gameCallbacksRef = DotNetObjectReference.Create(this);
+
             if (AutoConnectWallet && walletComponent is not null && !currentWalletState.IsConnected)
             {
                 await walletComponent.ConnectForLaunchAsync();
-            }
-
-            if (canvasRef.Context == null)
-            {
-                // Canvas will be initialized when game starts
             }
         }
     }
@@ -212,7 +203,23 @@
     private async Task StartGame()
     {
         if (!currentWalletState.IsConnected || string.IsNullOrEmpty(currentWalletState.Address))
+        {
             return;
+        }
+
+        if (gameRunning)
+        {
+            return;
+        }
+
+        if (gamePaused && currentSessionId.HasValue)
+        {
+            gameRunning = true;
+            gamePaused = false;
+            await JSRuntime.InvokeVoidAsync("window.gameRenderer.resumeGame", canvasRef);
+            StateHasChanged();
+            return;
+        }
 
         try
         {
@@ -227,8 +234,9 @@
             var session = await GameService.CreateGameSessionAsync(currentWalletState.Address, selectedDifficulty);
             currentSessionId = session.Id;
 
-            gameEngine.InitializeGame(selectedDifficulty);
+            activeGameToken++;
             gameRunning = true;
+            gamePaused = false;
             gameOver = false;
             playerWon = false;
             rewardClaimed = false;
@@ -239,15 +247,19 @@
             rewardWarningMessage = null;
             rewardTransactionHash = null;
             rewardExplorerUrl = null;
-            lastFrameTime = DateTime.UtcNow;
-
-            gameLoopCts = new CancellationTokenSource();
-            _ = GameLoop(gameLoopCts.Token);
+            await JSRuntime.InvokeVoidAsync(
+                "window.gameRenderer.startGame",
+                canvasRef,
+                selectedDifficulty,
+                gameCallbacksRef,
+                activeGameToken);
         }
         catch (Exception ex)
         {
             gameRunning = false;
+            gamePaused = false;
             currentSessionId = null;
+            activeGameToken++;
             gameErrorMessage = "Unable to start the game right now. Please try again in a moment.";
             Logger.LogError(ex, "Error starting game for wallet {WalletAddress}", currentWalletState.Address);
         }
@@ -255,94 +267,20 @@
         StateHasChanged();
     }
 
-    private async Task GameLoop(CancellationToken cancellationToken)
-    {
-        try
-        {
-            while (!cancellationToken.IsCancellationRequested && gameRunning)
-            {
-                var now = DateTime.UtcNow;
-                float deltaTime = (float)(now - lastFrameTime).TotalSeconds;
-                lastFrameTime = now;
-
-                // Clamp delta time to prevent huge jumps
-                if (deltaTime > 0.05f) deltaTime = 0.05f;
-
-                gameEngine.UpdateGame(deltaTime);
-                var state = gameEngine.GetGameState();
-
-                playerScore = state.PlayerScore;
-                opponentScore = state.OpponentScore;
-
-                await RenderGame(state);
-
-                if (state.GameOver)
-                {
-                    gameRunning = false;
-                    gameOver = true;
-                    playerWon = state.Winner == "Player";
-
-                    // End the game session
-                    if (currentSessionId.HasValue)
-                    {
-                        await GameService.EndGameSessionAsync(currentSessionId.Value, playerScore, opponentScore);
-
-                        await ClaimRewardAsync();
-                    }
-
-                    await InvokeAsync(StateHasChanged);
-                    break;
-                }
-
-                await Task.Delay(16); // ~60 FPS
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error in game loop for session {SessionId}", currentSessionId);
-        }
-    }
-
-    private async Task RenderGame(GameState state)
-    {
-        try
-        {
-            await JSRuntime.InvokeVoidAsync("window.gameRenderer.render", canvasRef, state);
-        }
-        catch
-        {
-            // Rendering errors are non-critical
-        }
-    }
-
-    private void OnMouseMove(MouseEventArgs e)
-    {
-        if (gameRunning && canvasRef.Context != null)
-        {
-            float yPosition = (float)e.ClientY;
-            gameEngine.UpdatePaddlePosition(true, yPosition);
-        }
-    }
-
-    private void OnTouchMove(TouchEventArgs e)
-    {
-        if (gameRunning && canvasRef.Context != null && e.Touches.Length > 0)
-        {
-            float yPosition = (float)e.Touches[0].ClientY;
-            gameEngine.UpdatePaddlePosition(true, yPosition);
-        }
-    }
-
-    private void PauseGame()
+    private async Task PauseGame()
     {
         gameRunning = false;
+        gamePaused = !gameOver;
+        await JSRuntime.InvokeVoidAsync("window.gameRenderer.pauseGame", canvasRef);
         StateHasChanged();
     }
 
-    private void ResetGame()
+    private async Task ResetGame()
     {
-        gameEngine.Reset();
+        await JSRuntime.InvokeVoidAsync("window.gameRenderer.resetGame", canvasRef);
         gameOver = false;
+        gamePaused = false;
+        gameRunning = false;
         playerWon = false;
         rewardClaimed = false;
         rewardClaimInProgress = false;
@@ -355,6 +293,64 @@
         rewardDiagnosticHint = null;
         rewardTransactionHash = null;
         rewardExplorerUrl = null;
+        activeGameToken++;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public Task OnGameScoreChanged(int latestPlayerScore, int latestOpponentScore, int gameToken)
+    {
+        if (gameToken != activeGameToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        playerScore = latestPlayerScore;
+        opponentScore = latestOpponentScore;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task OnGameCompleted(int finalPlayerScore, int finalOpponentScore, int gameToken)
+    {
+        if (gameToken != activeGameToken)
+        {
+            return;
+        }
+
+        if (Interlocked.Exchange(ref gameCompletionInProgressFlag, 1) == 1)
+        {
+            return;
+        }
+
+        gameRunning = false;
+        gamePaused = false;
+        gameOver = true;
+        playerScore = finalPlayerScore;
+        opponentScore = finalOpponentScore;
+        playerWon = playerScore > opponentScore;
+        try
+        {
+            if (currentSessionId.HasValue)
+            {
+                var completedSessionId = currentSessionId.Value;
+                await GameService.EndGameSessionAsync(completedSessionId, playerScore, opponentScore);
+                await ClaimRewardAsync();
+                currentSessionId = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            gameErrorMessage = "We couldn't finalize this game session. Please try another match in a moment.";
+            Logger.LogError(ex, "Error finalizing game completion for session {SessionId}", currentSessionId);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref gameCompletionInProgressFlag, 0);
+            activeGameToken++;
+        }
+
+        await InvokeAsync(StateHasChanged);
     }
 
     private Task RetryRewardClaim()
@@ -487,7 +483,15 @@
 
     async ValueTask IAsyncDisposable.DisposeAsync()
     {
-        gameLoopCts?.Cancel();
-        gameLoopCts?.Dispose();
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("window.gameRenderer.disposeGame", canvasRef);
+        }
+        catch
+        {
+            // best effort cleanup
+        }
+
+        gameCallbacksRef?.Dispose();
     }
 }
