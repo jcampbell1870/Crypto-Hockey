@@ -339,6 +339,34 @@ window.metamaskInterop = {
         }
     },
 
+    ensureRewardTokenVisible: async function (provider, request) {
+        if (!provider
+            || !request
+            || !request.tokenAddress
+            || !request.tokenSymbol
+            || !Number.isInteger(request.tokenDecimals)
+            || request.tokenDecimals < 0) {
+            return false;
+        }
+
+        try {
+            return await provider.request({
+                method: 'wallet_watchAsset',
+                params: {
+                    type: 'ERC20',
+                    options: {
+                        address: request.tokenAddress,
+                        symbol: request.tokenSymbol,
+                        decimals: request.tokenDecimals
+                    }
+                }
+            });
+        } catch (error) {
+            console.warn('Unable to add Arcade1870 token to MetaMask asset list:', error);
+            return false;
+        }
+    },
+
     submitRewardClaim: async function (request) {
         try {
             if (!request || !request.vaultAddress || !request.data) {
@@ -438,6 +466,8 @@ window.metamaskInterop = {
                 method: 'eth_sendTransaction',
                 params: [txParams],
             });
+
+            await this.ensureRewardTokenVisible(provider, request);
 
             return {
                 isSuccessful: true,

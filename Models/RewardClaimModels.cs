@@ -34,6 +34,9 @@ public class RewardClaimTransactionRequest
     public string VaultAddress { get; set; } = string.Empty;
     public int ChainId { get; set; }
     public string Data { get; set; } = string.Empty;
+    public string TokenAddress { get; set; } = string.Empty;
+    public string TokenSymbol { get; set; } = "A1870";
+    public int TokenDecimals { get; set; } = 18;
 }
 
 public class PreparedRewardClaimResult

@@ -185,7 +185,10 @@ public class GameService : IGameService
             {
                 VaultAddress = rewardClaim.Payload.VaultAddress,
                 ChainId = rewardClaim.Payload.ChainId,
-                Data = BuildRewardClaimTransactionData(rewardClaim.Payload)
+                Data = BuildRewardClaimTransactionData(rewardClaim.Payload),
+                TokenAddress = _blockchainConfig.Arcade1870ContractAddress,
+                TokenSymbol = "A1870",
+                TokenDecimals = _blockchainConfig.RewardTokenDecimals
             }
         };
     }
