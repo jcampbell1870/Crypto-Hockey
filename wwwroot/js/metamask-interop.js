@@ -488,13 +488,18 @@ window.metamaskInterop = {
                 params: [txParams],
             });
 
-            const receipt = await this.waitForTransactionReceipt(provider, txHash);
-            const status = receipt?.status;
-            const transactionSucceeded = status === true || status === '0x1' || status === '0x01';
+            this.waitForTransactionReceipt(provider, txHash)
+                .then(async receipt => {
+                    const status = receipt?.status;
+                    const transactionSucceeded = status === true || status === '0x1' || status === '0x01';
 
-            if (transactionSucceeded) {
-                await this.ensureRewardTokenVisible(provider, request);
-            }
+                    if (transactionSucceeded) {
+                        await this.ensureRewardTokenVisible(provider, request);
+                    }
+                })
+                .catch(error => {
+                    console.warn('Unable to confirm reward claim transaction for token visibility prompt:', error);
+                });
 
             return {
                 isSuccessful: true,
