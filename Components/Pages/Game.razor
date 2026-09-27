@@ -302,7 +302,9 @@
 
         if (currentSessionId.HasValue)
         {
-            await GameService.EndGameSessionAsync(currentSessionId.Value, playerScore, opponentScore);
+            var completedSessionId = currentSessionId.Value;
+            currentSessionId = null;
+            await GameService.EndGameSessionAsync(completedSessionId, playerScore, opponentScore);
             await ClaimRewardAsync();
         }
 

@@ -291,10 +291,12 @@
             event.preventDefault();
         };
 
-        canvas.addEventListener('mousemove', mouseMoveHandler);
-        canvas.addEventListener('touchmove', touchMoveHandler, { passive: false });
+        const touchMoveOptions = { passive: false };
 
-        const listeners = { mouseMoveHandler, touchMoveHandler };
+        canvas.addEventListener('mousemove', mouseMoveHandler);
+        canvas.addEventListener('touchmove', touchMoveHandler, touchMoveOptions);
+
+        const listeners = { mouseMoveHandler, touchMoveHandler, touchMoveOptions };
         canvasListeners.set(canvas, listeners);
         return listeners;
     }
@@ -306,7 +308,7 @@
         }
 
         canvas.removeEventListener('mousemove', listeners.mouseMoveHandler);
-        canvas.removeEventListener('touchmove', listeners.touchMoveHandler);
+        canvas.removeEventListener('touchmove', listeners.touchMoveHandler, listeners.touchMoveOptions);
         canvasListeners.delete(canvas);
     }
 
