@@ -1,6 +1,7 @@
 @page "/"
 @rendermode InteractiveServer
 @inject IJSRuntime JSRuntime
+@inject Microsoft.Extensions.Options.IOptions<Crypto_Hockey.Models.BlockchainConfig> BlockchainOptions
 
 <PageTitle>Crypto Hockey</PageTitle>
 
@@ -71,6 +72,40 @@
     </div>
 </div>
 
+<div class="container mt-4">
+    <div class="card import-token-card">
+        <div class="card-body">
+            <h2 class="h4">🦊 See Your Rewards: Import the Arcade1870 Token into MetaMask</h2>
+            <p>
+                Reward payouts are sent to your wallet automatically, but MetaMask does not show new tokens until you import them.
+                If your A1870 balance is not visible after claiming a reward, import the token once using the details below.
+            </p>
+
+            <ul class="list-unstyled mb-3">
+                <li><strong>Token Name:</strong> Arcade1870</li>
+                <li><strong>Token Symbol:</strong> A1870</li>
+                <li><strong>Token Decimals:</strong> @TokenDecimals</li>
+                <li><strong>Network:</strong> Ethereum Mainnet</li>
+                <li>
+                    <strong>Token Contract Address:</strong>
+                    <code class="text-break" id="arcade1870-contract-address">@TokenContractAddress</code>
+                </li>
+            </ul>
+
+            <h3 class="h5">How to import the token</h3>
+            <ol>
+                <li>Open MetaMask and make sure <strong>Ethereum Mainnet</strong> is selected as the network.</li>
+                <li>On the <strong>Tokens</strong> tab, scroll down and tap <strong>Import tokens</strong>.</li>
+                <li>Choose the <strong>Custom token</strong> option.</li>
+                <li>Paste the Token Contract Address shown above: <code class="text-break">@TokenContractAddress</code></li>
+                <li>MetaMask should fill in the symbol <strong>A1870</strong> and decimals <strong>@TokenDecimals</strong> automatically. If not, enter them manually.</li>
+                <li>Tap <strong>Next</strong>, then <strong>Import</strong>. Your Arcade1870 (A1870) balance will now appear in your wallet.</li>
+            </ol>
+            <p class="mb-0 text-muted small">You only need to do this once per wallet. Always verify the contract address matches exactly before importing.</p>
+        </div>
+    </div>
+</div>
+
 <div class="container mt-4 mb-5">
     <div class="alert alert-secondary text-center">
         For customer support, email <a href="mailto:Support1870@gmail.com">Support1870@gmail.com</a>.
@@ -78,6 +113,15 @@
 </div>
 
 @code {
+    private const string DefaultTokenContractAddress = "0x8eddD4edea39c5B5f77662453600F53A202EE47C";
+
+    private string TokenContractAddress =>
+        string.IsNullOrWhiteSpace(BlockchainOptions.Value.Arcade1870ContractAddress)
+            ? DefaultTokenContractAddress
+            : BlockchainOptions.Value.Arcade1870ContractAddress.Trim();
+
+    private int TokenDecimals => BlockchainOptions.Value.RewardTokenDecimals;
+
     private async Task OpenGameWithMetaMask()
     {
         await JSRuntime.InvokeVoidAsync("window.metamaskInterop.openGameInMetaMask");
